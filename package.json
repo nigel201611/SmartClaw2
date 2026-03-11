@@ -1,6 +1,6 @@
 {
   "name": "smartclaw",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Auto-configuring desktop chatbot agent based on OpenClaw",
   "private": true,
   "workspaces": [
@@ -16,7 +16,11 @@
     "build:mac": "npm run build:mac --workspace=apps/desktop",
     "build:linux": "npm run build:linux --workspace=apps/desktop",
     "start": "npm run start --workspace=apps/desktop",
-    "config-gen": "npm run start --workspace=@smartclaw/config-gen"
+    "smartclaw": "smartclaw",
+    "smartclaw:init": "smartclaw init",
+    "smartclaw:config": "smartclaw config",
+    "smartclaw:validate": "smartclaw validate",
+    "smartclaw:health": "smartclaw health"
   },
   "keywords": [
     "chatbot",
@@ -24,7 +28,8 @@
     "openclaw",
     "desktop",
     "electron",
-    "matrix"
+    "matrix",
+    "auto-config"
   ],
   "author": "Nigel Luo",
   "license": "MIT",

@@ -1,236 +1,303 @@
 #!/usr/bin/env node
 
 /**
- * SmartClaw Config Generator CLI
+ * SmartClaw Auto-Config Wizard CLI
  * 
- * Interactive wizard for generating SmartClaw configurations
+ * Interactive CLI for one-click SmartClaw setup
+ * 
+ * Commands:
+ *   smartclaw init      - Run full interactive setup wizard
+ *   smartclaw config    - Generate configs (non-interactive)
+ *   smartclaw validate  - Validate existing configurations
+ *   smartclaw health    - Run system health checks
+ *   smartclaw detect    - Environment detection only
  */
 
-const chalk = import('chalk').then(m => m.default).catch(() => ({ default: { 
-  green: s => s, 
-  blue: s => s, 
-  yellow: s => s, 
-  red: s => s,
-  bold: s => s
-}}));
-const inquirer = import('inquirer').catch(() => ({ default: { prompt: () => ({}), registerPrompt: () => {} } }));
 const fs = require('fs-extra');
 const path = require('path');
 
+// Dynamic imports for optional dependencies
+const chalkPromise = import('chalk').then(m => m.default).catch(() => createFallbackChalk());
+const inquirerPromise = import('inquirer').then(m => m.default).catch(() => null);
+const oraPromise = import('ora').then(m => m.default).catch(() => createFallbackOra());
+
+// Import modules
+const { runWizard } = require('./wizard');
 const { detectEnvironment } = require('./detector');
+const { validateAllConfigs, quickValidate } = require('./validator');
+const { runHealthCheck, displayHealthResults } = require('./health');
 const { generateOpenClawConfig } = require('./generators/openclaw');
 const { generateHigressConfig } = require('./generators/higress');
 const { generateMatrixConfig } = require('./generators/matrix');
 const { generateCredentials } = require('./generators/creds');
 
-const OUTPUT_DIR = path.join(process.cwd(), 'generated-configs');
+const OUTPUT_DIR = process.env.SMARTCLAW_OUTPUT_DIR || './generated-configs';
 
+/**
+ * Create fallback chalk (no colors)
+ */
+function createFallbackChalk() {
+  const identity = s => s;
+  return {
+    green: identity,
+    blue: identity,
+    yellow: identity,
+    red: identity,
+    bold: identity,
+    cyan: identity,
+    magenta: identity
+  };
+}
+
+/**
+ * Create fallback ora (no spinner)
+ */
+function createFallbackOra() {
+  return {
+    default: (text) => ({
+      start: () => ({ succeed: () => {}, fail: () => {} }),
+      succeed: () => {},
+      fail: () => {}
+    })
+  };
+}
+
+/**
+ * Main entry point
+ */
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0] || 'init';
 
-  console.log('\n🤖 SmartClaw Config Generator\n');
+  const chalk = await chalkPromise;
 
-  switch (command) {
-    case 'init':
-      await runWizard();
-      break;
-    case 'detect':
-      await runDetection();
-      break;
-    case 'generate':
-      await runGenerate();
-      break;
-    case 'validate':
-      await runValidate();
-      break;
-    case 'help':
-    case '--help':
-    case '-h':
-      showHelp();
-      break;
-    default:
-      console.log(`Unknown command: ${command}`);
-      showHelp();
-  }
-}
+  console.log('\n');
+  console.log(chalk.bold.blue('╔═══════════════════════════════════════════════════════════╗'));
+  console.log(chalk.bold.blue('║                                                           ║'));
+  console.log(chalk.bold.blue('║              🤖  SmartClaw CLI  🤖                        ║'));
+  console.log(chalk.bold.blue('║                                                           ║'));
+  console.log(chalk.bold.blue('║         Auto-configuring AI desktop chatbot               ║'));
+  console.log(chalk.bold.blue('║                                                           ║'));
+  console.log(chalk.bold.blue('╚═══════════════════════════════════════════════════════════╝'));
+  console.log('\n');
 
-async function runWizard() {
-  console.log('🚀 Starting SmartClaw Setup Wizard\n');
-  
-  // Step 1: Environment Detection
-  console.log('📊 Step 1: Detecting environment...\n');
-  const envInfo = await detectEnvironment();
-  displayEnvInfo(envInfo);
-
-  // Step 2: Interactive prompts
-  console.log('\n⚙️  Step 2: Configuration options\n');
-  
-  const answers = await (async () => {
-    try {
-      const inquirerMod = await inquirer;
-      return await inquirerMod.default.prompt([
-        {
-          type: 'input',
-          name: 'projectName',
-          message: 'Project name:',
-          default: 'smartclaw'
-        },
-        {
-          type: 'input',
-          name: 'workspacePath',
-          message: 'Workspace path:',
-          default: path.join(process.env.HOME || process.env.USERPROFILE || '.', 'smartclaw-workspace')
-        },
-        {
-          type: 'input',
-          name: 'modelEndpoint',
-          message: 'LLM model endpoint (via Higress):',
-          default: 'http://127.0.0.1:8001/openai/v1'
-        },
-        {
-          type: 'password',
-          name: 'apiKey',
-          message: 'API Key (will be encrypted):',
-          mask: '*'
-        },
-        {
-          type: 'input',
-          name: 'matrixServer',
-          message: 'Matrix server URL:',
-          default: 'http://localhost:8008'
-        },
-        {
-          type: 'confirm',
-          name: 'useDocker',
-          message: 'Use Docker for deployment?',
-          default: envInfo.docker.available
-        }
-      ]);
-    } catch (e) {
-      console.log('Inquirer not available, using defaults...');
-      return {
-        projectName: 'smartclaw',
-        workspacePath: path.join(process.env.HOME || '.', 'smartclaw-workspace'),
-        modelEndpoint: 'http://127.0.0.1:8001/openai/v1',
-        apiKey: '',
-        matrixServer: 'http://localhost:8008',
-        useDocker: envInfo.docker.available
-      };
+  try {
+    switch (command) {
+      case 'init':
+        await cmdInit(chalk);
+        break;
+      case 'config':
+        await cmdConfig(chalk);
+        break;
+      case 'validate':
+        await cmdValidate(chalk);
+        break;
+      case 'health':
+        await cmdHealth(chalk);
+        break;
+      case 'detect':
+        await cmdDetect(chalk);
+        break;
+      case 'help':
+      case '--help':
+      case '-h':
+        showHelp(chalk);
+        break;
+      default:
+        console.log(chalk.red(`Unknown command: ${command}`));
+        showHelp(chalk);
+        process.exit(1);
     }
-  })();
-
-  // Step 3: Generate configurations
-  console.log('\n🔧 Step 3: Generating configurations...\n');
-  
-  await fs.ensureDir(OUTPUT_DIR);
-  
-  const config = {
-    ...answers,
-    envInfo
-  };
-
-  await generateOpenClawConfig(config, OUTPUT_DIR);
-  await generateHigressConfig(config, OUTPUT_DIR);
-  await generateMatrixConfig(config, OUTPUT_DIR);
-  await generateCredentials(config, OUTPUT_DIR);
-
-  console.log('\n✅ Configuration generation complete!\n');
-  console.log(`📁 Output directory: ${OUTPUT_DIR}`);
-  console.log('\nGenerated files:');
-  console.log('  - openclaw.json');
-  console.log('  - higress/config.yaml');
-  console.log('  - matrix/homeserver.yaml');
-  console.log('  - credentials/encrypted/.env.enc');
-  console.log('  - README.md\n');
-}
-
-async function runDetection() {
-  console.log('📊 Environment Detection\n');
-  const envInfo = await detectEnvironment();
-  displayEnvInfo(envInfo);
-}
-
-async function runGenerate() {
-  console.log('🔧 Generating configurations...\n');
-  await fs.ensureDir(OUTPUT_DIR);
-  
-  const envInfo = await detectEnvironment();
-  const config = {
-    projectName: 'smartclaw',
-    workspacePath: path.join(process.env.HOME || '.', 'smartclaw-workspace'),
-    modelEndpoint: 'http://127.0.0.1:8001/openai/v1',
-    apiKey: '',
-    matrixServer: 'http://localhost:8008',
-    useDocker: envInfo.docker.available,
-    envInfo
-  };
-
-  await generateOpenClawConfig(config, OUTPUT_DIR);
-  await generateHigressConfig(config, OUTPUT_DIR);
-  await generateMatrixConfig(config, OUTPUT_DIR);
-  await generateCredentials(config, OUTPUT_DIR);
-
-  console.log('✅ Configurations generated successfully!');
-}
-
-async function runValidate() {
-  console.log('🔍 Validating configurations...\n');
-  
-  const requiredFiles = [
-    'openclaw.json',
-    'higress/config.yaml',
-    'matrix/homeserver.yaml'
-  ];
-
-  let allValid = true;
-  for (const file of requiredFiles) {
-    const filePath = path.join(OUTPUT_DIR, file);
-    if (await fs.pathExists(filePath)) {
-      console.log(`✅ ${file}`);
-    } else {
-      console.log(`❌ ${file} - NOT FOUND`);
-      allValid = false;
+  } catch (error) {
+    console.error(chalk.red('\n❌ Error:'), error.message);
+    if (process.env.DEBUG) {
+      console.error(error);
     }
-  }
-
-  if (allValid) {
-    console.log('\n✅ All configurations are valid!');
-  } else {
-    console.log('\n❌ Some configurations are missing. Run "config-gen init" to generate.');
     process.exit(1);
   }
 }
 
-function displayEnvInfo(envInfo) {
-  const c = require('chalk');
-  console.log('Operating System:', c.blue(envInfo.os));
-  console.log('Node.js Version:', c.blue(envInfo.nodeVersion));
-  console.log('Docker:', envInfo.docker.available ? c.green('Available') : c.yellow('Not available'));
-  console.log('Port Availability:');
-  for (const [port, available] of Object.entries(envInfo.ports)) {
-    console.log(`  - ${port}:`, available ? c.green('Free') : c.red('In use'));
+/**
+ * Command: init - Full interactive wizard
+ */
+async function cmdInit(chalk) {
+  console.log(chalk.yellow('⟳') + ' Starting SmartClaw Setup Wizard...\n');
+  
+  const config = await runWizard();
+  
+  if (config) {
+    console.log(chalk.green('\n✓ Setup completed successfully!'));
+    console.log(chalk.blue('\nNext steps:'));
+    console.log('  1. Review generated configs in: ' + chalk.bold(OUTPUT_DIR));
+    console.log('  2. Run: ' + chalk.bold('npm install'));
+    console.log('  3. Run: ' + chalk.bold('npm run dev:desktop'));
+    console.log('');
   }
 }
 
-function showHelp() {
+/**
+ * Command: config - Generate configs (non-interactive)
+ */
+async function cmdConfig(chalk) {
+  console.log(chalk.yellow('⟳') + ' Generating configurations...\n');
+  
+  const envInfo = await detectEnvironment();
+  
+  const config = {
+    projectName: 'smartclaw',
+    workspacePath: path.join(process.env.HOME || '.', 'smartclaw-workspace'),
+    matrixServer: envInfo.ports['6167'] ? 'http://localhost:6167' : 'https://matrix.example.com',
+    modelEndpoint: 'http://127.0.0.1:8001/openai/v1',
+    apiKey: '',
+    useDocker: envInfo.docker.available,
+    envInfo
+  };
+
+  await fs.ensureDir(OUTPUT_DIR);
+  
+  console.log(chalk.green('✓') + ' Generating openclaw.json...');
+  await generateOpenClawConfig(config, OUTPUT_DIR);
+  
+  console.log(chalk.green('✓') + ' Generating Higress config...');
+  await generateHigressConfig(config, OUTPUT_DIR);
+  
+  console.log(chalk.green('✓') + ' Generating Matrix config...');
+  await generateMatrixConfig(config, OUTPUT_DIR);
+  
+  console.log(chalk.green('✓') + ' Encrypting credentials...');
+  await generateCredentials(config, OUTPUT_DIR);
+  
+  console.log('\n' + chalk.green('✓') + ' Configurations generated successfully!');
+  console.log(chalk.blue('📁 Output:') + ' ' + OUTPUT_DIR);
+  console.log('');
+}
+
+/**
+ * Command: validate - Validate existing configurations
+ */
+async function cmdValidate(chalk) {
+  console.log(chalk.yellow('⟳') + ' Validating configurations...\n');
+  
+  // Check if configs exist
+  const quickResult = await quickValidate(OUTPUT_DIR);
+  
+  if (!quickResult.valid) {
+    console.log(chalk.red('✗') + ' Configuration directory not found or incomplete\n');
+    console.log(chalk.yellow('Missing files:'));
+    quickResult.missing.forEach(file => {
+      console.log('  - ' + file);
+    });
+    console.log('\nRun ' + chalk.bold('smartclaw init') + ' to generate configurations.\n');
+    process.exit(1);
+  }
+  
+  // Full validation
+  const results = await validateAllConfigs(OUTPUT_DIR);
+  
+  if (results.valid) {
+    console.log(chalk.green('✓') + ' All configurations are valid!\n');
+    
+    console.log(chalk.blue('Validated:'));
+    for (const [name, result] of Object.entries(results.configs)) {
+      const status = result.valid ? chalk.green('✓') : chalk.red('✗');
+      console.log(`  ${status} ${name}`);
+    }
+    
+    if (results.warnings.length > 0) {
+      console.log('\n' + chalk.yellow('Warnings:'));
+      results.warnings.forEach(w => console.log('  - ' + w));
+    }
+  } else {
+    console.log(chalk.red('✗') + ' Configuration validation failed!\n');
+    console.log(chalk.red('Errors:'));
+    results.errors.forEach(e => console.log('  - ' + e));
+    process.exit(1);
+  }
+  
+  console.log('');
+}
+
+/**
+ * Command: health - Run system health checks
+ */
+async function cmdHealth(chalk) {
+  console.log(chalk.yellow('⟳') + ' Running health checks...\n');
+  
+  const results = await runHealthCheck(OUTPUT_DIR);
+  displayHealthResults(results, chalk);
+  
+  if (!results.healthy) {
+    console.log(chalk.yellow('Some issues were found. Review the results above.\n'));
+    process.exit(1);
+  }
+}
+
+/**
+ * Command: detect - Environment detection only
+ */
+async function cmdDetect(chalk) {
+  console.log(chalk.yellow('⟳') + ' Detecting environment...\n');
+  
+  const envInfo = await detectEnvironment();
+  
+  console.log(chalk.bold('Environment Report'));
+  console.log('─────────────────────────────────────\n');
+  
+  console.log(chalk.blue('Operating System:') + ' ' + envInfo.os);
+  console.log(chalk.blue('Node.js Version:') + ' ' + envInfo.nodeVersion);
+  console.log(chalk.blue('Node.js OK:') + ' ' + (envInfo.nodeMeetsRequirement ? chalk.green('Yes') : chalk.red('No')));
+  console.log(chalk.blue('Docker Available:') + ' ' + (envInfo.docker.available ? chalk.green('Yes') : chalk.yellow('No')));
+  console.log(chalk.blue('Docker Running:') + ' ' + (envInfo.docker.running ? chalk.green('Yes') : chalk.yellow('No')));
+  
+  console.log('\n' + chalk.blue('Port Availability:'));
+  for (const [port, available] of Object.entries(envInfo.ports)) {
+    const status = available ? chalk.green('Free') : chalk.red('In use');
+    console.log(`  ${port}: ${status}`);
+  }
+  
+  if (envInfo.existingConfigs.length > 0) {
+    console.log('\n' + chalk.blue('Existing Configurations:'));
+    envInfo.existingConfigs.forEach(p => console.log('  - ' + p));
+  }
+  
+  console.log('\n' + chalk.blue('Detected at:') + ' ' + envInfo.timestamp);
+  console.log('');
+}
+
+/**
+ * Show help
+ */
+function showHelp(chalk) {
   console.log(`
-SmartClaw Config Generator - Usage:
+${chalk.bold('SmartClaw CLI')} - Auto-configuration wizard
 
-  config-gen init       Run full setup wizard (interactive)
-  config-gen detect     Run environment detection only
-  config-gen generate   Generate configs with defaults
-  config-gen validate   Validate existing configurations
-  config-gen help       Show this help message
+${chalk.bold('USAGE:')}
+  smartclaw <command> [options]
 
-Examples:
+${chalk.bold('COMMANDS:')}
+  init        Run full interactive setup wizard
+  config      Generate configurations (non-interactive)
+  validate    Validate existing configurations
+  health      Run system health checks
+  detect      Show environment detection results
+  help        Show this help message
 
-  config-gen init       # Start interactive wizard
-  config-gen detect     # Check system compatibility
+${chalk.bold('EXAMPLES:')}
+  smartclaw init              # Start interactive wizard
+  smartclaw config            # Generate configs with defaults
+  smartclaw validate          # Check if configs are valid
+  smartclaw health            # Run health checks
+  smartclaw detect            # Show environment info
+
+${chalk.bold('ENVIRONMENT VARIABLES:')}
+  SMARTCLAW_OUTPUT_DIR        Output directory (default: ./generated-configs)
+  DEBUG                       Enable debug mode (show stack traces)
+
+${chalk.bold('MORE INFO:')}
+  GitHub: https://github.com/nigel201611/SmartClaw
+  Docs:   https://github.com/nigel201611/SmartClaw/blob/main/README.md
 `);
 }
 
-main().catch(err => {
-  console.error('Error:', err.message);
-  process.exit(1);
-});
+// Run main
+main();

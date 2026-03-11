@@ -1,16 +1,36 @@
 {
   "name": "@smartclaw/config-gen",
-  "version": "0.1.0",
-  "description": "SmartClaw configuration generator CLI",
-  "main": "src/index.js",
+  "version": "0.4.0",
+  "description": "SmartClaw Auto-Configuration Wizard CLI",
+  "main": "src/cli.js",
   "bin": {
+    "smartclaw": "./src/cli.js",
     "config-gen": "./src/cli.js"
   },
   "scripts": {
-    "dev": "echo 'Config-gen dev - to be implemented'",
-    "build": "echo 'Config-gen build - to be implemented'"
+    "dev": "node --watch src/cli.js",
+    "start": "node src/cli.js",
+    "test": "node test/test.js"
   },
-  "keywords": ["cli", "config", "generator"],
-  "author": "nigel-luo",
-  "license": "MIT"
+  "keywords": [
+    "cli",
+    "config",
+    "generator",
+    "wizard",
+    "smartclaw",
+    "setup"
+  ],
+  "author": "Nigel Luo",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^9.2.0",
+    "chalk": "^5.3.0",
+    "ora": "^7.0.0",
+    "fs-extra": "^11.2.0",
+    "dotenv": "^16.3.0",
+    "yaml": "^2.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

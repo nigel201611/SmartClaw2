@@ -1,22 +1,14 @@
 {
   "name": "@smartclaw/desktop",
-  "version": "0.2.0",
-  "description": "SmartClaw Electron Desktop Application",
-  "main": "electron-main.js",
+  "version": "0.1.0",
+  "description": "SmartClaw Electron desktop application",
+  "main": "src/main.js",
   "scripts": {
-    "dev": "electron .",
-    "build": "electron-builder",
-    "lint": "echo 'No linting configured yet'"
+    "dev": "echo 'Desktop dev server - to be implemented'",
+    "build": "echo 'Desktop build - to be implemented'",
+    "start": "echo 'Desktop start - to be implemented'"
   },
-  "keywords": [
-    "electron",
-    "desktop",
-    "chatbot"
-  ],
-  "author": "Nigel Luo",
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.0.0"
-  }
+  "keywords": ["electron", "desktop", "chatbot"],
+  "author": "nigel-luo",
+  "license": "MIT"
 }

@@ -16,12 +16,6 @@ out/
 .env
 .env.local
 .env.*.local
-!.env.template
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # IDE
 .idea/
@@ -41,23 +35,5 @@ coverage/
 tmp/
 temp/
 
-# Generated configurations (keep template, ignore actual configs)
-generated-configs/openclaw.json
-generated-configs/higress/
-generated-configs/matrix/
-generated-configs/credentials/
-generated-configs/.env
-
-# Secrets and keys
-*.key
-*.pem
-*.crt
-secrets/
-
-# MinIO / Hiclaw shared files
+# MinIO / Hiclaw shared files (should not be committed)
 *.minio-sync
-.processing
-
-# Database files
-*.db
-*.sqlite

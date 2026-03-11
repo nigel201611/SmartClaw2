@@ -1,26 +1,32 @@
 # SmartClaw
 
-🤖 **Auto-configuring Desktop Chatbot based on OpenClaw**
+🤖 **Auto-configuring desktop chatbot agent based on OpenClaw** - Intelligent, fast, and easy to set up.
 
-SmartClaw is a desktop chatbot application inspired by Tencent Qclaw, built with Electron and OpenClaw. It provides an intelligent, auto-configuring chat interface that runs locally on your desktop.
+Inspired by Tencent Qclaw, SmartClaw brings the power of OpenClaw to your desktop with a beautiful Electron-based UI.
+
+---
 
 ## ✨ Features
 
-- 🖥️ **Native Desktop App** - Cross-platform Electron application (Windows, macOS, Linux)
-- 🤖 **AI-Powered** - Built on OpenClaw agent framework
-- ⚙️ **Auto-Configuration** - Intelligent config generator for easy setup
-- 💬 **Real-time Chat** - Smooth, responsive chat interface
-- 🎨 **Modern UI** - Clean, intuitive user interface
-- 🔌 **Extensible** - Plugin architecture for custom integrations
-- 🔒 **Local First** - Your data stays on your device
+- **🎯 Auto-Configuration**: Intelligent setup with minimal user input
+- **💻 Desktop Native**: Built with Electron for cross-platform support (Windows, macOS, Linux)
+- **🧠 AI-Powered**: Leverages OpenClaw's agent framework for intelligent conversations
+- **🔌 Extensible**: Plugin architecture for custom skills and integrations
+- **🔒 Secure**: Local-first design with optional cloud sync
+- **⚡ Fast**: Optimized performance with minimal resource usage
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Runtime**: Node.js >= 18.x
-- **Desktop Framework**: Electron
-- **Agent Framework**: OpenClaw
-- **Package Manager**: npm (monorepo with workspaces)
-- **Language**: JavaScript/TypeScript
+| Component | Technology |
+|-----------|------------|
+| Desktop App | Electron + React/TypeScript |
+| Agent Runtime | OpenClaw (Node.js) |
+| Config Generator | TypeScript CLI |
+| Package Manager | npm workspaces (monorepo) |
+
+---
 
 ## 📁 Project Structure
 
@@ -28,139 +34,67 @@ SmartClaw is a desktop chatbot application inspired by Tencent Qclaw, built with
 SmartClaw/
 ├── apps/
 │   ├── desktop/       # Electron desktop application
-│   │   ├── src/       # Application source code
-│   │   ├── electron-main.js
-│   │   └── package.json
-│   └── agent/         # OpenClaw Worker agent
-│       ├── src/       # Agent source code
-│       └── package.json
+│   └── agent/         # OpenClaw agent runtime
 ├── packages/
-│   └── config-gen/    # Auto-configuration generator CLI
-│       ├── src/
-│       │   ├── cli.js           # CLI entry point
-│       │   ├── detector.js      # Environment detection
-│       │   ├── generators/      # Config generators
-│       │   └── utils/           # Utilities
-│       └── package.json
-├── generated-configs/  # Auto-generated configurations
-│   ├── openclaw.json
-│   ├── higress/
-│   ├── matrix/
-│   └── credentials/
-├── package.json       # Monorepo root configuration
+│   └── config-gen/    # Configuration generator CLI
+├── package.json       # Root monorepo config
 ├── README.md
 └── .gitignore
 ```
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js >= 18.x
-- npm >= 9.x
+- Node.js >= 18.0.0
+- npm >= 9.0.0
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/nigel201611/SmartClaw.git
-   cd SmartClaw
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Run configuration wizard** (Phase 2)
-   ```bash
-   npm run config-gen:init
-   ```
-
-4. **Start the desktop app**
-   ```bash
-   npm run dev
-   ```
-
-### Configuration Generator (Phase 2)
-
-The config-gen CLI provides automatic environment detection and configuration generation:
-
 ```bash
-# Full interactive setup wizard
-npm run config-gen:init
+# Clone the repository
+git clone https://github.com/nigel201611/SmartClaw.git
+cd SmartClaw
 
-# Environment detection only
-npm run config-gen:detect
+# Install dependencies
+npm install
 
-# Generate configs with defaults
-npm run config-gen:generate
-
-# Validate existing configurations
-npm run config-gen:validate
+# Start development
+npm run dev:desktop    # Start desktop app
+npm run dev:agent      # Start agent runtime
 ```
 
-#### What it generates:
-
-- **openclaw.json** - Agent runtime configuration
-- **higress/config.yaml** - Gateway routing configuration
-- **matrix/homeserver.yaml** - Matrix server configuration
-- **credentials/** - Encrypted credential storage
-
-### Development
+### Build
 
 ```bash
-# Start desktop app in dev mode
-npm run dev:desktop
-
-# Start agent in dev mode
-npm run dev:agent
-
 # Build all workspaces
 npm run build
 
-# Run linter
-npm run lint
+# Start the application
+npm start
 ```
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📞 Contact
-
-- **Author**: Nigel Luo
-- **GitHub**: [@nigel201611](https://github.com/nigel201611)
 
 ---
 
-Built with ❤️ using OpenClaw
+## 📋 Development Phases
 
-## 📋 Development Progress
+- [x] **Phase 1**: Project Setup & Structure
+- [ ] **Phase 2**: Core Agent Integration
+- [ ] **Phase 3**: Desktop UI Development
+- [ ] **Phase 4**: Configuration Generator
+- [ ] **Phase 5**: Polish & Release
 
-### Phase 1: Project Setup ✅
-- [x] Initialize monorepo structure
-- [x] Set up npm workspaces
-- [x] Create basic Electron app skeleton
-- [x] Create OpenClaw agent skeleton
-- [x] Add README and documentation
+---
 
-### Phase 2: Configuration Generator ✅
-- [x] Environment detection module
-- [x] Port availability checker
-- [x] openclaw.json generator
-- [x] Higress gateway config generator
-- [x] Matrix homeserver config generator
-- [x] Encrypted credential storage
-- [x] Interactive CLI wizard
-- [x] Validation commands
+## 📄 License
 
-### Phase 3: Core Features (Coming Soon)
-- [ ] Desktop app UI implementation
-- [ ] Agent-Desktop communication
-- [ ] Chat interface
-- [ ] Settings panel
+MIT License - see LICENSE file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- [OpenClaw](https://github.com/openclaw/openclaw) - The foundation of SmartClaw
+- [Tencent Qclaw](https://github.com/Tencent/qclaw) - Inspiration for this project

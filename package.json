@@ -1,0 +1,28 @@
+{
+  "name": "smartclaw",
+  "version": "0.1.0",
+  "description": "Auto-configuring desktop chatbot agent based on OpenClaw",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:desktop": "npm run dev --workspace=apps/desktop",
+    "dev:agent": "npm run dev --workspace=apps/agent",
+    "build": "npm run build --workspaces",
+    "start": "npm run start --workspace=apps/desktop"
+  },
+  "keywords": [
+    "chatbot",
+    "agent",
+    "openclaw",
+    "desktop",
+    "electron"
+  ],
+  "author": "nigel-luo",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

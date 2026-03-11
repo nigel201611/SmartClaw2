@@ -1,0 +1,14 @@
+{
+  "name": "@smartclaw/desktop",
+  "version": "0.1.0",
+  "description": "SmartClaw Electron desktop application",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "echo 'Desktop dev server - to be implemented'",
+    "build": "echo 'Desktop build - to be implemented'",
+    "start": "echo 'Desktop start - to be implemented'"
+  },
+  "keywords": ["electron", "desktop", "chatbot"],
+  "author": "nigel-luo",
+  "license": "MIT"
+}

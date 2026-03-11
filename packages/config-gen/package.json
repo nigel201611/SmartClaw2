@@ -1,0 +1,16 @@
+{
+  "name": "@smartclaw/config-gen",
+  "version": "0.1.0",
+  "description": "SmartClaw configuration generator CLI",
+  "main": "src/index.js",
+  "bin": {
+    "config-gen": "./src/cli.js"
+  },
+  "scripts": {
+    "dev": "echo 'Config-gen dev - to be implemented'",
+    "build": "echo 'Config-gen build - to be implemented'"
+  },
+  "keywords": ["cli", "config", "generator"],
+  "author": "nigel-luo",
+  "license": "MIT"
+}

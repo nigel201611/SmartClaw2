@@ -1,14 +1,58 @@
 {
   "name": "@smartclaw/desktop",
-  "version": "0.1.0",
-  "description": "SmartClaw Electron desktop application",
-  "main": "src/main.js",
+  "version": "0.3.0",
+  "description": "SmartClaw Electron Desktop Application",
+  "main": "electron-main.js",
   "scripts": {
-    "dev": "echo 'Desktop dev server - to be implemented'",
-    "build": "echo 'Desktop build - to be implemented'",
-    "start": "echo 'Desktop start - to be implemented'"
+    "dev": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "lint": "echo 'No linting configured yet'"
   },
-  "keywords": ["electron", "desktop", "chatbot"],
-  "author": "nigel-luo",
-  "license": "MIT"
+  "keywords": [
+    "electron",
+    "desktop",
+    "chatbot",
+    "matrix",
+    "smartclaw"
+  ],
+  "author": "Nigel Luo",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0"
+  },
+  "dependencies": {
+    "matrix-js-sdk": "^30.0.0"
+  },
+  "build": {
+    "appId": "io.hiclaw.smartclaw",
+    "productName": "SmartClaw",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron-main.js",
+      "preload.js",
+      "src/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "tray/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "tray/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
 }

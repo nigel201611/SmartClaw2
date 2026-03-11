@@ -3,42 +3,134 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
   <title>SmartClaw</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #1a1a2e; color: #eee;
-      height: 100vh; display: flex; flex-direction: column;
-    }
-    .header { background: #16213e; padding: 1rem; text-align: center; border-bottom: 1px solid #0f3460; }
-    .header h1 { font-size: 1.5rem; color: #e94560; }
-    .chat-container { flex: 1; display: flex; flex-direction: column; padding: 1rem; overflow: hidden; }
-    .messages { flex: 1; overflow-y: auto; margin-bottom: 1rem; }
-    .message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; max-width: 80%; }
-    .message.user { background: #0f3460; margin-left: auto; }
-    .message.assistant { background: #16213e; }
-    .input-area { display: flex; gap: 0.5rem; }
-    .input-area input { flex: 1; padding: 0.75rem 1rem; border: none; border-radius: 8px; background: #16213e; color: #eee; font-size: 1rem; }
-    .input-area input:focus { outline: 2px solid #e94560; }
-    .input-area button { padding: 0.75rem 1.5rem; background: #e94560; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; }
-    .input-area button:hover { background: #ff6b6b; }
-    .welcome { text-align: center; padding: 3rem; color: #888; }
-    .welcome h2 { color: #e94560; margin-bottom: 0.5rem; }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="header"><h1>🤖 SmartClaw</h1></header>
-  <main class="chat-container">
-    <div class="messages" id="messages">
-      <div class="welcome"><h2>Welcome to SmartClaw!</h2><p>Your AI-powered desktop chatbot assistant</p></div>
+  <div class="app-container">
+    <!-- Title Bar -->
+    <div class="title-bar">
+      <div class="title-bar-drag"></div>
+      <div class="title-bar-controls">
+        <button class="title-bar-btn minimize" id="minimizeBtn">−</button>
+        <button class="title-bar-btn maximize" id="maximizeBtn">□</button>
+        <button class="title-bar-btn close" id="closeBtn">×</button>
+      </div>
     </div>
-    <div class="input-area">
-      <input type="text" id="messageInput" placeholder="Type your message..." />
-      <button id="sendBtn">Send</button>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="app-title">🤖 SmartClaw</h1>
+        <button class="settings-btn" id="settingsBtn">⚙️</button>
+      </div>
+      
+      <div class="conversation-list" id="conversationList">
+        <div class="conversation-item active">
+          <div class="conversation-avatar">🤖</div>
+          <div class="conversation-info">
+            <div class="conversation-name">SmartClaw Assistant</div>
+            <div class="conversation-preview">Ready to help!</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">👤</div>
+          <div class="user-name" id="userName">User</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="chat-area">
+      <div class="chat-header">
+        <h2 class="chat-title">SmartClaw Assistant</h2>
+        <div class="chat-status">
+          <span class="status-indicator online"></span>
+          <span class="status-text" id="connectionStatus">Connected</span>
+        </div>
+      </div>
+      
+      <div class="messages-container" id="messagesContainer">
+        <div class="messages-list" id="messagesList">
+          <div class="message assistant">
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+              <div class="message-header">
+                <span class="message-sender">SmartClaw Assistant</span>
+                <span class="message-time">Now</span>
+              </div>
+              <div class="message-text">Welcome to SmartClaw! I'm your AI-powered desktop assistant. How can I help you today?</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="input-area">
+        <div class="input-wrapper">
+          <input 
+            type="text" 
+            id="messageInput" 
+            class="message-input" 
+            placeholder="Type your message..."
+            autocomplete="off"
+          />
+          <button class="send-btn" id="sendBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Settings Panel (hidden by default) -->
+    <div class="settings-panel hidden" id="settingsPanel">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="close-settings-btn" id="closeSettingsBtn">×</button>
+      </div>
+      
+      <div class="settings-content">
+        <div class="settings-section">
+          <h3>Server Configuration</h3>
+          <div class="setting-item">
+            <label for="matrixServer">Matrix Server</label>
+            <input type="text" id="matrixServer" placeholder="https://matrix.example.com" />
+          </div>
+          <div class="setting-item">
+            <label for="accessToken">Access Token</label>
+            <input type="password" id="accessToken" placeholder="Your Matrix access token" />
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>Preferences</h3>
+          <div class="setting-item">
+            <label for="theme">Theme</label>
+            <select id="theme">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label for="language">Language</label>
+            <select id="language">
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </div>
+        </div>
+        
+        <button class="save-settings-btn" id="saveSettingsBtn">Save Settings</button>
+      </div>
     </div>
-  </main>
+  </div>
+
+  <script src="matrix-client.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

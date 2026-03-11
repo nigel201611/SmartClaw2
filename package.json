@@ -1,0 +1,39 @@
+{
+  "name": "smartclaw",
+  "version": "0.2.0",
+  "description": "Auto-configuring desktop chatbot based on OpenClaw",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:desktop",
+    "dev:desktop": "npm run dev --workspace=apps/desktop",
+    "dev:agent": "npm run dev --workspace=apps/agent",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "config-gen": "npm run start --workspace=@smartclaw/config-gen",
+    "config-gen:init": "npm run config-gen -- init",
+    "config-gen:detect": "npm run config-gen -- detect",
+    "config-gen:generate": "npm run config-gen -- generate",
+    "config-gen:validate": "npm run config-gen -- validate"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "keywords": [
+    "chatbot",
+    "desktop",
+    "electron",
+    "openclaw",
+    "ai",
+    "auto-config"
+  ],
+  "author": "Nigel Luo",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nigel201611/SmartClaw.git"
+  }
+}

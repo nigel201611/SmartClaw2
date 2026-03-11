@@ -1,0 +1,20 @@
+{
+  "name": "@smartclaw/agent",
+  "version": "0.2.0",
+  "description": "SmartClaw OpenClaw Worker Agent",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "lint": "echo 'No linting configured yet'"
+  },
+  "keywords": [
+    "openclaw",
+    "agent",
+    "chatbot"
+  ],
+  "author": "Nigel Luo",
+  "license": "MIT",
+  "dependencies": {
+    "@openclaw/worker": "^0.1.0"
+  }
+}

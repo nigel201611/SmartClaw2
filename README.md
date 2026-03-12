@@ -97,4 +97,3 @@ MIT License - see LICENSE file for details.
 ## 🙏 Acknowledgments
 
 - [OpenClaw](https://github.com/openclaw/openclaw) - The foundation of SmartClaw
-- [Tencent Qclaw](https://github.com/Tencent/qclaw) - Inspiration for this project

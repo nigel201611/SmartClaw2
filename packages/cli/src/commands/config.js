@@ -19,7 +19,7 @@ async function runConfig(options) {
     const openclawConfig = {
       agent: {
         id: 'nigel-luo',
-        workspace: path.join(process.env.HOME || '.', 'hiclaw-fs', 'agents', 'nigel-luo')
+        workspace: path.join(process.env.HOME || '.', 'smartclaw-fs', 'agents', 'nigel-luo')
       },
       matrix: {
         server: 'http://matrix-local.hiclaw.io:18080',

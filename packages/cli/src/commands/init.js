@@ -34,7 +34,7 @@ async function runInit() {
         type: 'input',
         name: 'workspacePath',
         message: 'Workspace directory:',
-        default: process.env.HOME ? path.join(process.env.HOME, 'hiclaw-fs') : './hiclaw-fs',
+        default: process.env.HOME ? path.join(process.env.HOME, 'smartclaw-fs') : './smartclaw-fs',
         validate: (input) => input.length > 0 || 'Please enter a valid path'
       },
       {

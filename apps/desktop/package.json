@@ -14,7 +14,7 @@
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "build:all": "electron-builder -mwl",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "echo 'Run npm run build manually when ready'"
   },
   "dependencies": {
     "matrix-js-sdk": "^30.0.0"

@@ -19,7 +19,7 @@ const program = new Command();
 
 // Get package version
 const packageJson = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8')
+  fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8')
 );
 
 program

@@ -22,7 +22,7 @@
     "smartclaw:config": "smartclaw config",
     "smartclaw:validate": "smartclaw validate",
     "smartclaw:health": "smartclaw health",
-    "postinstall": "npm run build --workspace=apps/desktop || echo 'Build optional'"
+    "postinstall": "echo 'Installation complete! Run npm run build manually if you want to build the desktop app.'"
   },
   "keywords": [
     "chatbot",

@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
-  <title>SmartClaw</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>SmartClaw - AI Desktop Assistant</title>
+  <link rel="stylesheet" href="styles-enhanced.css">
 </head>
 <body>
   <div class="app-container">
@@ -23,15 +23,24 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <h1 class="app-title">🤖 SmartClaw</h1>
-        <button class="settings-btn" id="settingsBtn">⚙️</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">🌓</button>
+          <button class="settings-btn" id="settingsBtn">⚙️</button>
+        </div>
       </div>
       
-      <div class="conversation-list" id="conversationList">
-        <div class="conversation-item active">
-          <div class="conversation-avatar">🤖</div>
-          <div class="conversation-info">
-            <div class="conversation-name">SmartClaw Assistant</div>
-            <div class="conversation-preview">Ready to help!</div>
+      <div class="room-list" id="roomList">
+        <div class="room-list-header">
+          <span>Messages</span>
+        </div>
+        <div class="room-item active" data-room-id="main">
+          <div class="room-avatar">🤖</div>
+          <div class="room-info">
+            <div class="room-name">SmartClaw Assistant</div>
+            <div class="room-preview">Ready to help!</div>
+          </div>
+          <div class="room-meta">
+            <span class="room-time">Now</span>
           </div>
         </div>
       </div>
@@ -108,16 +117,27 @@
         </div>
         
         <div class="settings-section">
-          <h3>Preferences</h3>
+          <h3>🎨 Appearance</h3>
           <div class="setting-item">
             <label for="theme">Theme</label>
             <select id="theme">
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
+              <option value="dark">🌙 Dark</option>
+              <option value="light">☀️ Light</option>
             </select>
           </div>
           <div class="setting-item">
-            <label for="language">Language</label>
+            <label>Notifications</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notificationsToggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>🌐 Language</h3>
+          <div class="setting-item">
+            <label for="language">Interface Language</label>
             <select id="language">
               <option value="en">English</option>
               <option value="zh">中文</option>
@@ -131,6 +151,6 @@
   </div>
 
   <script src="matrix-client.js"></script>
-  <script src="renderer.js"></script>
+  <script src="renderer-enhanced.js"></script>
 </body>
 </html>

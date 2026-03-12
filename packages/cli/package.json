@@ -1,0 +1,31 @@
+{
+  "name": "@smartclaw/cli",
+  "version": "1.0.0",
+  "description": "SmartClaw CLI - Auto-config wizard and setup tool",
+  "main": "src/index.js",
+  "bin": {
+    "smartclaw": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "smartclaw",
+    "cli",
+    "auto-config",
+    "wizard",
+    "openclaw"
+  ],
+  "author": "Nigel Luo",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "^9.2.0",
+    "chalk": "^5.3.0",
+    "commander": "^11.0.0",
+    "fs-extra": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

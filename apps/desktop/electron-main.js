@@ -96,8 +96,54 @@ function createTray() {
   });
 }
 
+// Check if first run (no config exists)
+function isFirstRun() {
+  const configPath = path.join(app.getPath('userData'), 'config.json');
+  return !fs.existsSync(configPath);
+}
+
 // Handle app ready
 app.whenReady().then(() => {
+  // Show setup wizard on first run
+  if (isFirstRun()) {
+    const setupWindow = new BrowserWindow({
+      width: 600,
+      height: 700,
+      resizable: false,
+      fullscreenable: false,
+      title: 'SmartClaw Setup',
+      icon: path.join(__dirname, 'tray/icon.png'),
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        nodeIntegration: true,
+        contextIsolation: false,
+        sandbox: false,
+      },
+    });
+    
+    setupWindow.loadFile(path.join(__dirname, 'src', 'setup.html'));
+    setupWindow.setMenu(null);
+    
+    // Listen for setup completion
+    ipcMain.once('setup-complete', () => {
+      setupWindow.close();
+      createWindow();
+    });
+    
+    setupWindow.on('closed', () => {
+      // If closed before completion, still create main window
+      if (!mainWindow) {
+        createWindow();
+      }
+    });
+    
+    createTray();
+    return;
+  }
+  
+  // Normal launch - create main window
+  createWindow();
+  createTray();
   createWindow();
   createTray();
   

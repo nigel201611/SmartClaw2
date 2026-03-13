@@ -69,8 +69,7 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": false,
-      "publish": ["github"]
+      "notarize": false
     },
     "dmg": {
       "title": "${productName} ${version}",
@@ -98,9 +97,7 @@
           "target": "portable",
           "arch": ["x64"]
         }
-      ],
-      "publisherName": "Nigel Luo",
-      "publish": ["github"]
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -128,8 +125,7 @@
           "arch": ["x64"]
         }
       ],
-      "category": "Utility",
-      "publish": ["github"]
+      "category": "Utility"
     },
     "appImage": {
       "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
@@ -137,12 +133,6 @@
     "deb": {
       "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libdrm2", "libxkbfile1"],
       "packageCategory": "utils"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "nigel201611",
-      "repo": "SmartClaw",
-      "releaseType": "release"
     },
     "fileAssociations": [],
     "protocols": [

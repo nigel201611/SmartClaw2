@@ -16,8 +16,8 @@ function createWindow() {
     icon: path.join(__dirname, 'tray/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
+      nodeIntegration: true,
+      contextIsolation: false,
       sandbox: false,
     },
   });

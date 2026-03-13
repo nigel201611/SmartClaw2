@@ -4,7 +4,7 @@
  * 应用主入口，集成 Docker 启动流程
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import { getAppStartupManager, AppStartupManager, StartupState } from './app-startup';
 import { registerDockerIPCHandlers, cleanupDockerIPC } from './docker-ipc';
@@ -142,13 +142,13 @@ app.on('render-process-gone', (event, webContents, details) => {
   console.error('Render process gone:', details);
   
   if (mainWindow) {
-    dialog.showMessageBox(mainWindow, {
+    dialog.showMessageBox({
       type: 'error',
       title: '渲染进程崩溃',
       message: '应用界面发生错误',
       detail: details.reason,
       buttons: ['重新加载', '退出应用']
-    }).then((result) => {
+    }).then((result: { response: number }) => {
       if (result.response === 0) {
         mainWindow?.reload();
       } else {
@@ -202,8 +202,8 @@ if (process.env.NODE_ENV === 'development') {
   app.whenReady().then(() => {
     import('electron-devtools-installer').then(({ default: installExtension, REACT_DEVELOPER_TOOLS }) => {
       installExtension(REACT_DEVELOPER_TOOLS)
-        .then((name) => console.log(`Added Extension: ${name}`))
-        .catch((err) => console.log('An error occurred: ', err));
+        .then((ext: any) => console.log(`Added Extension: ${ext.name || ext}`))
+        .catch((err: Error) => console.log('An error occurred: ', err));
     }).catch(() => {
       // 忽略安装错误
     });

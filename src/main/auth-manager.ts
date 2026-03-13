@@ -4,7 +4,7 @@
  * 用户认证管理：登录/注册/会话恢复/凭证存储
  */
 
-import { keytar } from 'electron';
+import * as keytar from 'keytar';
 import { getMatrixClient, MatrixClientWrapper, MatrixSession } from './matrix-client';
 import * as crypto from 'crypto';
 
@@ -235,7 +235,8 @@ export class AuthManager {
       
       let password = '';
       if (config.rememberMe) {
-        password = await keytar.getPassword(KEYCHAIN_SERVICE, config.username);
+        const retrievedPassword = await keytar.getPassword(KEYCHAIN_SERVICE, config.username);
+        password = retrievedPassword || '';
       }
 
       return {

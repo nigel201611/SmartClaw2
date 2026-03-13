@@ -178,12 +178,12 @@ export class TrayManager {
       if (this.containerRunning) {
         const result = await this.dockerManager.stopContainer();
         if (!result.success) {
-          this.showError('停止失败', result.error);
+          this.showError('停止失败', result.error || '未知错误');
         }
       } else {
         const result = await this.dockerManager.startContainer();
         if (!result.success) {
-          this.showError('启动失败', result.error);
+          this.showError('启动失败', result.error || '未知错误');
         }
       }
       await this.updateTrayMenu();
@@ -199,7 +199,7 @@ export class TrayManager {
     try {
       const result = await this.dockerManager.restartContainer();
       if (!result.success) {
-        this.showError('重启失败', result.error);
+        this.showError('重启失败', result.error || '未知错误');
       }
       await this.updateTrayMenu();
     } catch (error: any) {

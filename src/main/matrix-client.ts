@@ -77,7 +77,6 @@ export class MatrixClientWrapper {
       const opts: ICreateClientOpts = {
         baseUrl: url,
         timelineSupport: true,
-        unstableClientRelationAggregation: true,
         useAuthorizationHeader: true
       };
 
@@ -151,8 +150,7 @@ export class MatrixClientWrapper {
         accessToken: session.accessToken,
         userId: session.userId,
         deviceId: session.deviceId,
-        timelineSupport: true,
-        unstableClientRelationAggregation: true
+        timelineSupport: true
       };
 
       this.client = createClient(opts);
@@ -190,13 +188,13 @@ export class MatrixClientWrapper {
     if (!this.client) return;
 
     // 监听同步事件
-    this.client.on('sync', (state, prevState, data) => {
+    (this.client as any).on('sync', (state: string, prevState: string, data: any) => {
       console.log('Matrix sync state:', state, prevState);
       this.emit('sync', { state, prevState, data });
     });
 
     // 监听房间消息
-    this.client.on('Room.timeline', (event, room, toStartOfTimeline) => {
+    (this.client as any).on('Room.timeline', (event: any, room: any, toStartOfTimeline: any) => {
       if (toStartOfTimeline) return; // 忽略历史消息
       
       if (event.getType() === 'm.room.message') {
@@ -206,18 +204,18 @@ export class MatrixClientWrapper {
     });
 
     // 监听房间更新
-    this.client.on('Room', (room) => {
+    (this.client as any).on('Room', (room: any) => {
       this.emit('room', this.parseRoom(room));
     });
 
     // 监听错误
-    this.client.on('error', (error) => {
+    (this.client as any).on('error', (error: any) => {
       console.error('Matrix client error:', error);
       this.emit('error', error);
     });
 
     // 监听登录状态
-    this.client.on('Session.logged_out', () => {
+    (this.client as any).on('Session.logged_out', () => {
       console.warn('Matrix session logged out');
       this.emit('logged_out', {});
     });
@@ -235,7 +233,7 @@ export class MatrixClientWrapper {
         reject(new Error('Sync timeout'));
       }, 30000);
 
-      this.client!.once('sync', (state) => {
+      (this.client as any).once('sync', (state: string) => {
         clearTimeout(timeout);
         if (state === 'PREPARED' || state === 'SYNCING') {
           resolve();
@@ -453,15 +451,16 @@ export class MatrixClientWrapper {
    * 解析消息事件
    */
   private parseMessage(event: MatrixEvent): MessageContent {
+    const content = event.getContent();
     return {
       roomId: event.getRoomId()!,
       eventId: event.getId()!,
       sender: event.getSender()!,
       timestamp: event.getTs(),
       content: {
-        msgtype: event.getContent().msgtype,
-        body: event.getContent().body,
-        formatted_body: event.getContent().formatted_body
+        msgtype: content.msgtype || 'm.text',
+        body: content.body || '',
+        formatted_body: content.formatted_body
       },
       type: event.getType()
     };
@@ -470,15 +469,15 @@ export class MatrixClientWrapper {
   /**
    * 解析房间信息
    */
-  private parseRoom(room: Room): RoomInfo {
+  private parseRoom(room: any): RoomInfo {
     const lastEvent = room.timeline[room.timeline.length - 1];
     
     return {
       roomId: room.roomId,
       name: room.name || room.roomId,
-      topic: room.topic,
+      topic: (room.currentState as any)?.topic,
       members: room.getJoinedMembers().length,
-      isDirect: room.isDirectRoom(),
+      isDirect: room.isDirectRoom?.() || false,
       lastMessage: lastEvent ? this.parseMessage(lastEvent) : undefined
     };
   }

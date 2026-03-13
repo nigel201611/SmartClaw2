@@ -293,7 +293,7 @@ export function registerMatrixIPCHandlers(mainWindow: BrowserWindow) {
     async (event, events: string[]): Promise<MatrixIPCResponse<void>> => {
       try {
         events.forEach(eventName => {
-          client.on(eventName, (data) => {
+          client.on(eventName, (data: any) => {
             mainWindow.webContents.send(`matrix:event:${eventName}`, data);
           });
         });

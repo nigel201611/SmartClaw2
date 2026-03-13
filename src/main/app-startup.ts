@@ -140,7 +140,7 @@ export class AppStartupManager {
     const friendlyMessage = this.dockerDetector.getFriendlyErrorMessage(dockerStatus);
 
     // 显示对话框（可选：替代启动窗口）
-    const result = await dialog.showMessageBox(this.startupWindow || undefined, {
+    const result = await dialog.showMessageBox({
       type: 'warning',
       title: friendlyMessage.title,
       message: friendlyMessage.title,
@@ -354,7 +354,7 @@ export class AppStartupManager {
   /**
    * 应用关闭处理
    */
-  private async onAppClosing(): Promise<void> {
+  async onAppClosing(): Promise<void> {
     // 停止容器（可选：根据用户设置决定是否停止）
     const shouldStop = await this.shouldStopContainersOnExit();
     

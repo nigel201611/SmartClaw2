@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>SmartClaw - AI Desktop Assistant</title>
+  <link rel="stylesheet" href="styles-enhanced.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Title Bar -->
+    <div class="title-bar">
+      <div class="title-bar-drag"></div>
+      <div class="title-bar-controls">
+        <button class="title-bar-btn minimize" id="minimizeBtn">−</button>
+        <button class="title-bar-btn maximize" id="maximizeBtn">□</button>
+        <button class="title-bar-btn close" id="closeBtn">×</button>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="app-title">🤖 SmartClaw</h1>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">🌓</button>
+          <button class="settings-btn" id="settingsBtn">⚙️</button>
+        </div>
+      </div>
+      
+      <div class="room-list" id="roomList">
+        <div class="room-list-header">
+          <span>Messages</span>
+        </div>
+        <div class="room-item active" data-room-id="main">
+          <div class="room-avatar">🤖</div>
+          <div class="room-info">
+            <div class="room-name">SmartClaw Assistant</div>
+            <div class="room-preview">Ready to help!</div>
+          </div>
+          <div class="room-meta">
+            <span class="room-time">Now</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar">👤</div>
+          <div class="user-name" id="userName">User</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="chat-area">
+      <div class="chat-header">
+        <h2 class="chat-title">SmartClaw Assistant</h2>
+        <div class="chat-status">
+          <span class="status-indicator online"></span>
+          <span class="status-text" id="connectionStatus">Connected</span>
+        </div>
+      </div>
+      
+      <div class="messages-container" id="messagesContainer">
+        <div class="messages-list" id="messagesList">
+          <div class="message assistant">
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+              <div class="message-header">
+                <span class="message-sender">SmartClaw Assistant</span>
+                <span class="message-time">Now</span>
+              </div>
+              <div class="message-text">Welcome to SmartClaw! I'm your AI-powered desktop assistant. How can I help you today?</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="input-area">
+        <div class="input-wrapper">
+          <input 
+            type="text" 
+            id="messageInput" 
+            class="message-input" 
+            placeholder="Type your message..."
+            autocomplete="off"
+          />
+          <button class="send-btn" id="sendBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Settings Panel (hidden by default) -->
+    <div class="settings-panel hidden" id="settingsPanel">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="close-settings-btn" id="closeSettingsBtn">×</button>
+      </div>
+      
+      <div class="settings-content">
+        <div class="settings-section">
+          <h3>Server Configuration</h3>
+          <div class="setting-item">
+            <label for="matrixServer">Matrix Server</label>
+            <input type="text" id="matrixServer" placeholder="https://matrix.example.com" />
+          </div>
+          <div class="setting-item">
+            <label for="accessToken">Access Token</label>
+            <input type="password" id="accessToken" placeholder="Your Matrix access token" />
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>🎨 Appearance</h3>
+          <div class="setting-item">
+            <label for="theme">Theme</label>
+            <select id="theme">
+              <option value="dark">🌙 Dark</option>
+              <option value="light">☀️ Light</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label>Notifications</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notificationsToggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>🌐 Language</h3>
+          <div class="setting-item">
+            <label for="language">Interface Language</label>
+            <select id="language">
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </div>
+        </div>
+        
+        <button class="save-settings-btn" id="saveSettingsBtn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="matrix-client.js"></script>
+  <script src="renderer-enhanced.js"></script>
+</body>
+</html>

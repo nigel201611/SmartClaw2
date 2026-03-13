@@ -213,11 +213,11 @@ sudo dpkg -i SmartClaw-2.0.0.deb
 - **网站**: https://smartclaw.io
 - **邮箱**: support@smartclaw.io
 - **Matrix**: @smartclaw:matrix.org
-- **GitHub**: https://github.com/smartclaw/smartclaw2
+- **GitHub**: https://github.com/smartclaw/SmartClaw2
 
 ### 报告问题
 请在 GitHub Issues 报告问题：
-https://github.com/smartclaw/smartclaw2/issues
+https://github.com/smartclaw/SmartClaw2/issues
 
 ---
 
@@ -236,8 +236,6 @@ https://github.com/smartclaw/smartclaw2/issues
 ## 📄 许可证
 
 SmartClaw v2.0 使用 MIT 许可证。
-
-详见：https://github.com/smartclaw/smartclaw2/blob/main/LICENSE
 
 ---
 

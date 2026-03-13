@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useMatrix } from '../hooks/useMatrix';
+import { useMatrix } from '../../hooks/useMatrix';
 import { RoomList } from './RoomList';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';

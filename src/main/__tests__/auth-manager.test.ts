@@ -13,7 +13,7 @@ vi.mock('keytar', () => ({
 }));
 
 // Mock matrix-client
-vi.mock('./matrix-client', () => ({
+vi.mock('../matrix-client', () => ({
   getMatrixClient: vi.fn(() => ({
     connect: vi.fn(),
     login: vi.fn(),
@@ -59,9 +59,16 @@ describe('AuthManager', () => {
     });
   });
 
+  describe('login mocks', () => {
+    it('should mock matrix client', async () => {
+      const { getMatrixClient } = await import('../matrix-client');
+      expect(getMatrixClient).toBeDefined();
+    });
+  });
+
   describe('logout', () => {
     it('should logout successfully', async () => {
-      const { getMatrixClient } = await import('./matrix-client');
+      const { getMatrixClient } = await import('../matrix-client');
       const mockClient = getMatrixClient();
       mockClient.logout = vi.fn().mockResolvedValue(undefined);
 
@@ -74,7 +81,7 @@ describe('AuthManager', () => {
 
     it('should clear credentials on logout', async () => {
       const keytar = await import('keytar');
-      const { getMatrixClient } = await import('./matrix-client');
+      const { getMatrixClient } = await import('../matrix-client');
       const mockClient = getMatrixClient();
       mockClient.logout = vi.fn().mockResolvedValue(undefined);
       keytar.getPassword = vi.fn().mockResolvedValue(JSON.stringify({ username: 'test', rememberMe: true }));

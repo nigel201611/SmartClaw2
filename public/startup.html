@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>SmartClaw 启动中...</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .container {
+      text-align: center;
+      color: white;
+      padding: 2rem;
+    }
+
+    .logo {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .status {
+      font-size: 0.9rem;
+      opacity: 0.9;
+      margin-bottom: 2rem;
+    }
+
+    /* 加载动画 */
+    .spinner {
+      width: 50px;
+      height: 50px;
+      margin: 0 auto 1.5rem;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* 进度条 */
+    .progress {
+      width: 200px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: white;
+      border-radius: 2px;
+      animation: progress 2s ease-in-out infinite;
+      transform-origin: left;
+    }
+
+    @keyframes progress {
+      0% { transform: scaleX(0); }
+      50% { transform: scaleX(0.7); }
+      100% { transform: scaleX(1); }
+    }
+
+    /* 步骤指示 */
+    .steps {
+      margin-top: 2rem;
+      text-align: left;
+      max-width: 300px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+
+    .step.active {
+      opacity: 1;
+    }
+
+    .step.completed {
+      opacity: 1;
+    }
+
+    .step-icon {
+      width: 24px;
+      height: 24px;
+      margin-right: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+    }
+
+    .step.pending .step-icon {
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+    }
+
+    .step.active .step-icon {
+      border: 2px solid white;
+      border-radius: 50%;
+    }
+
+    .step.completed .step-icon {
+      background: white;
+      color: #667eea;
+      border-radius: 50%;
+    }
+
+    /* 错误状态 */
+    .error {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .error-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .error h2 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .error p {
+      font-size: 0.9rem;
+      opacity: 0.9;
+      margin-bottom: 1rem;
+    }
+
+    .error button {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 0.5rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+
+    .error button.secondary {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+    }
+
+    /* 成功状态 */
+    .success {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid rgba(34, 197, 94, 0.5);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .success-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    /* 隐藏类 */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">🎩</div>
+    <h1>SmartClaw</h1>
+    <p class="status" id="statusText">正在启动...</p>
+
+    <!-- 加载动画 -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="progress">
+        <div class="progress-bar"></div>
+      </div>
+    </div>
+
+    <!-- 步骤指示 -->
+    <div class="steps" id="steps">
+      <div class="step pending" id="step1">
+        <div class="step-icon">○</div>
+        <span>检测 Docker 环境</span>
+      </div>
+      <div class="step pending" id="step2">
+        <div class="step-icon">○</div>
+        <span>启动 Matrix 容器</span>
+      </div>
+      <div class="step pending" id="step3">
+        <div class="step-icon">○</div>
+        <span>等待服务就绪</span>
+      </div>
+      <div class="step pending" id="step4">
+        <div class="step-icon">○</div>
+        <span>初始化应用</span>
+      </div>
+    </div>
+
+    <!-- 错误消息 -->
+    <div id="error" class="error hidden">
+      <div class="error-icon">⚠️</div>
+      <h2 id="errorTitle">启动失败</h2>
+      <p id="errorMessage">发生错误</p>
+      <button id="retryBtn">重试</button>
+      <button id="quitBtn" class="secondary">退出</button>
+    </div>
+
+    <!-- 成功消息 -->
+    <div id="success" class="success hidden">
+      <div class="success-icon">✅</div>
+      <h2>启动成功！</h2>
+      <p>正在打开主界面...</p>
+    </div>
+  </div>
+
+  <script>
+    // 步骤状态管理
+    const steps = ['step1', 'step2', 'step3', 'step4'];
+    
+    function setStepActive(index) {
+      steps.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (i < index) {
+          el.className = 'step completed';
+          el.querySelector('.step-icon').textContent = '✓';
+        } else if (i === index) {
+          el.className = 'step active';
+          el.querySelector('.step-icon').textContent = '◉';
+        } else {
+          el.className = 'step pending';
+          el.querySelector('.step-icon').textContent = '○';
+        }
+      });
+    }
+
+    function showLoading(show) {
+      document.getElementById('loading').classList.toggle('hidden', !show);
+    }
+
+    function showSteps(show) {
+      document.getElementById('steps').classList.toggle('hidden', !show);
+    }
+
+    function showError(title, message) {
+      showLoading(false);
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMessage').textContent = message;
+      document.getElementById('error').classList.remove('hidden');
+    }
+
+    function showSuccess() {
+      showLoading(false);
+      showSteps(false);
+      document.getElementById('success').classList.remove('hidden');
+    }
+
+    // 监听主进程消息
+    const { ipcRenderer } = require('electron');
+
+    // 接收 Docker 状态
+    ipcRenderer.on('docker-status', (event, status) => {
+      console.log('Docker status:', status);
+      
+      if (!status.installed || !status.running) {
+        // Docker 未就绪
+        showError(
+          'Docker 未就绪',
+          status.error || '请先安装并启动 Docker'
+        );
+      }
+    });
+
+    // 接收启动状态更新
+    ipcRenderer.on('startup-state', (event, state) => {
+      console.log('Startup state:', state);
+      
+      switch (state) {
+        case 'checking-docker':
+          setStepActive(0);
+          document.getElementById('statusText').textContent = '正在检测 Docker 环境...';
+          break;
+        case 'starting-containers':
+          setStepActive(1);
+          document.getElementById('statusText').textContent = '正在启动 Matrix 容器...';
+          break;
+        case 'waiting-healthy':
+          setStepActive(2);
+          document.getElementById('statusText').textContent = '等待服务就绪...';
+          break;
+        case 'initializing-matrix':
+          setStepActive(3);
+          document.getElementById('statusText').textContent = '正在初始化应用...';
+          break;
+        case 'ready':
+          showSuccess();
+          break;
+        case 'error':
+          showError('启动失败', '发生未知错误');
+          break;
+      }
+    });
+
+    // 按钮事件
+    document.getElementById('retryBtn')?.addEventListener('click', () => {
+      location.reload();
+    });
+
+    document.getElementById('quitBtn')?.addEventListener('click', () => {
+      ipcRenderer.send('app:quit');
+    });
+
+    // 初始化
+    setStepActive(0);
+  </script>
+</body>
+</html>

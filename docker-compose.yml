@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  conduit:
+    image: matrixconduit/matrix-conduit:latest
+    container_name: smartclaw-matrix
+    ports:
+      - "${MATRIX_PORT:-8008}:8008"
+    volumes:
+      - ./data/conduit:/var/lib/matrix-conduit
+      - ./config/conduit.toml:/etc/conduit/conduit.toml:ro
+    environment:
+      - CONDUIT_CONFIG=/etc/conduit/conduit.toml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/_matrix/client/versions"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+          cpus: '0.5'
+    restart: unless-stopped
+    networks:
+      - smartclaw-net
+
+networks:
+  smartclaw-net:
+    driver: bridge

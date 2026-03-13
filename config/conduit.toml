@@ -1,0 +1,47 @@
+# SmartClaw Conduit Configuration
+# https://conduit.rs/configuration.html
+
+[global]
+# Server name (must match what clients will use)
+server_name = "localhost"
+
+# Network binding
+address = "0.0.0.0"
+port = 8008
+
+# Federation settings (disabled for local-only mode)
+federation = false
+allow_federation = false
+
+# Registration settings
+allow_registration = true
+allow_join_requests = false
+
+# Encryption
+enable_encryption = true
+
+# File uploads
+max_request_size = 104857600  # 100MB
+
+# Logging
+log_level = "info"
+
+# Database settings (using default RocksDB)
+# data_path is set via volume mount
+
+[server]
+# Trust all local users as server admins
+# (single-user local deployment)
+
+# Performance tuning for desktop
+concurrent_request_limit = 50
+max_concurrent_requests = 100
+
+# Security
+allow_tls = false  # Not needed for localhost
+
+# Presence
+enable_presence = true
+
+# Push notifications (disabled for local-only)
+push_enabled = false

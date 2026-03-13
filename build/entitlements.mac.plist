@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 应用沙盒权限 -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    
+    <!-- 网络访问 -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+    
+    <!-- 文件访问 -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
+    
+    <!-- 密钥链访问（用于凭证存储） -->
+    <key>com.apple.security.keychain</key>
+    <true/>
+    
+    <!-- 音频输入（语音消息） -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    
+    <!-- 摄像头（视频通话） -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
+    
+    <!-- 临时例外：允许执行 docker 命令 -->
+    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+    <array>
+        <string>.smartclaw/</string>
+    </array>
+    
+    <!-- 进程执行（用于 Docker 命令） -->
+    <key>com.apple.security.temporary-exception.apple-events</key>
+    <array>
+        <string>com.docker.docker</string>
+    </array>
+</dict>
+</plist>

@@ -1,0 +1,168 @@
+{
+  "appId": "io.smartclaw.desktop",
+  "productName": "SmartClaw",
+  "version": "2.0.0",
+  "description": "Local Matrix Server Desktop Client",
+  "author": "SmartClaw Team",
+  "homepage": "https://smartclaw.io",
+  "buildVersion": "2026.03.13",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "npm run build:main && npm run build:renderer",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "matrix-js-sdk": "^30.0.0",
+    "better-sqlite3": "^9.4.3",
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.3.0",
+    "vite": "^5.1.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/keytar": "^7.7.3"
+  },
+  "build": {
+    "appId": "io.smartclaw.desktop",
+    "productName": "SmartClaw",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "docker-compose.yml",
+      "config/**/*",
+      "public/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "docker-compose.yml",
+        "to": "resources/docker-compose.yml"
+      },
+      {
+        "from": "config/conduit.toml",
+        "to": "resources/config/conduit.toml"
+      },
+      {
+        "from": ".env.example",
+        "to": "resources/.env.example"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icons/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "SmartClaw needs microphone access for voice messages",
+        "NSCameraUsageDescription": "SmartClaw needs camera access for video calls"
+      },
+      "darkModeSupport": true,
+      "type": "distribution",
+      "notarize": {
+        "teamId": "${APPLE_TEAM_ID}"
+      },
+      "signIgnore": [
+        "\\.mp4$",
+        "\\.mov$",
+        "\\.webm$"
+      ]
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "backgroundColor": "#667eea"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icons/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "signingHashAlgorithms": [
+        "sha256"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SmartClaw"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icons",
+      "category": "Network",
+      "desktop": {
+        "Name": "SmartClaw",
+        "Comment": "Local Matrix Server Desktop Client",
+        "MimeType": "x-scheme-handler/matrix;"
+      }
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "smartclaw",
+      "repo": "smartclaw-desktop",
+      "releaseType": "release"
+    }
+  }
+}

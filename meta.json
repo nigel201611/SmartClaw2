@@ -1,0 +1,16 @@
+{
+  "project_id": "smartclaw-v2-standalone",
+  "title": "SmartClaw v2.0 Standalone",
+  "project_room_id": "!inabxAk5y6p69h9LBz:matrix-local.hiclaw.io:18080",
+  "status": "completed",
+  "workers": [
+    "nigel-luo"
+  ],
+  "created_at": "2026-03-13T10:24:31Z",
+  "confirmed_at": "2026-03-13T18:25:00Z",
+  "completed_at": "2026-03-13T19:08:00Z",
+  "release_tag": "v2.0.0",
+  "total_files": 59,
+  "total_code_size": "~322KB",
+  "test_pass_rate": "9/9 (100%)"
+}

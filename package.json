@@ -7,6 +7,9 @@
     "apps/*",
     "packages/*"
   ],
+  "devDependencies": {
+    "electron": "^28.0.0"
+  },
   "scripts": {
     "dev": "npm run dev:desktop",
     "dev:desktop": "npm run dev --workspace=apps/desktop",

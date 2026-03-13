@@ -20,11 +20,12 @@
     "matrix-js-sdk": "^30.0.0"
   },
   "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.0",
+    "electron": "28.3.3",
+    "electron-builder": "25.0.0",
     "electron-updater": "^6.1.0"
   },
   "build": {
+    "electronVersion": "28.3.3",
     "appId": "io.hiclaw.smartclaw",
     "productName": "SmartClaw",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",

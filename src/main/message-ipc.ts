@@ -7,7 +7,7 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { getMessageStore, MessageStore } from './message-store';
 import { getSyncManager, SyncManager, SyncProgress } from './sync-manager';
-import { MessageContent } from '../shared/types';
+import { MessageContent } from './types';
 
 /**
  * 消息存储 IPC 通道

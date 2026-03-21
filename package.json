@@ -1,4 +1,5 @@
 {
+  "name": "smartclaw",
   "appId": "io.smartclaw.desktop",
   "productName": "SmartClaw",
   "version": "2.0.0",
@@ -6,7 +7,7 @@
   "author": "SmartClaw Team",
   "homepage": "https://smartclaw.io",
   "buildVersion": "2026.03.13",
-  "main": "dist/main/main.js",
+  "main": "dist/main.js",
   "scripts": {
     "start": "electron .",
     "build": "npm run build:main && npm run build:renderer",

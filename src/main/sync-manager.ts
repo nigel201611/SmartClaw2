@@ -7,7 +7,7 @@
 
 import { getMatrixClient, MatrixClientWrapper } from './matrix-client';
 import { getMessageStore, MessageStore } from './message-store';
-import { MessageContent } from '../shared/types';
+import { MessageContent } from './types';
 
 /**
  * 同步状态

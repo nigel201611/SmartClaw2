@@ -8,7 +8,7 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import { app } from 'electron';
-import { MessageContent } from '../shared/types';
+import { MessageContent } from './types';
 
 /**
  * 本地消息记录

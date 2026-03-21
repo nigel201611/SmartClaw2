@@ -6,6 +6,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
 import * as os from 'os';
 
 const execAsync = promisify(exec);
@@ -14,36 +15,22 @@ const execAsync = promisify(exec);
  * Docker 检测结果接口
  */
 export interface DockerStatus {
-  /** Docker 是否可用（完全就绪） */
   available: boolean;
-  /** docker 命令是否已安装 */
   installed: boolean;
-  /** Docker Daemon 是否运行 */
   running: boolean;
-  /** 用户是否有权限运行 Docker */
   hasPermission: boolean;
-  /** 是否使用 Docker Desktop */
   isDesktop: boolean;
-  /** 错误信息（如果有） */
   error: string | null;
-  /** 错误类型 */
   errorType: DockerErrorType | null;
-  /** 版本信息 */
   version: string | null;
 }
 
-/**
- * Docker 错误类型
- */
 export type DockerErrorType =
   | 'NOT_INSTALLED'
   | 'DAEMON_NOT_RUNNING'
   | 'NO_PERMISSION'
   | 'UNKNOWN';
 
-/**
- * 平台特定的安装引导链接
- */
 const INSTALL_GUIDES: Record<string, { url: string; title: string }> = {
   darwin: {
     url: 'https://docs.docker.com/desktop/install-mac/',
@@ -59,9 +46,6 @@ const INSTALL_GUIDES: Record<string, { url: string; title: string }> = {
   }
 };
 
-/**
- * Docker 检测器类
- */
 export class DockerDetector {
   private platform: string;
 
@@ -69,9 +53,6 @@ export class DockerDetector {
     this.platform = process.platform;
   }
 
-  /**
-   * 完整 Docker 环境检测
-   */
   async detectDocker(): Promise<DockerStatus> {
     const status: DockerStatus = {
       available: false,
@@ -84,7 +65,64 @@ export class DockerDetector {
       version: null
     };
 
-    // 1. 检查 docker 命令是否存在
+    // macOS: Check Docker Desktop socket first (more reliable than CLI)
+    if (this.platform === 'darwin') {
+      const desktopSocket = '/var/run/docker.sock';
+      const desktopSocketAlt = `${os.homedir()}/.docker/run/docker.sock`;
+      
+      if (fs.existsSync(desktopSocket) || fs.existsSync(desktopSocketAlt)) {
+        status.installed = true;
+        status.isDesktop = true;
+        status.running = true;
+        
+        // Try to get version via socket
+        try {
+          const { stdout } = await execAsync('docker --version 2>/dev/null || echo "Docker Desktop"');
+          status.version = stdout.trim() || 'Docker Desktop';
+          status.hasPermission = true;
+          status.available = true;
+          return status;
+        } catch (error) {
+          // Socket exists but CLI not available
+          status.hasPermission = true;
+          status.available = true;
+          status.version = 'Docker Desktop';
+          return status;
+        }
+      }
+    }
+
+    // Linux: Check Docker socket
+    if (this.platform === 'linux') {
+      const linuxSocket = '/var/run/docker.sock';
+      if (fs.existsSync(linuxSocket)) {
+        status.installed = true;
+        status.running = true;
+        
+        try {
+          const { stdout } = await execAsync('docker --version');
+          const versionMatch = stdout.match(/Docker version ([\d.]+)/);
+          status.version = versionMatch ? versionMatch[1] : stdout.trim();
+          
+          try {
+            await execAsync('docker ps');
+            status.hasPermission = true;
+            status.available = true;
+            return status;
+          } catch (permError) {
+            status.error = 'Docker 权限不足。请将当前用户加入 docker 组：\nsudo usermod -aG docker $USER\n然后重新登录。';
+            status.errorType = 'NO_PERMISSION';
+            return status;
+          }
+        } catch (error) {
+          status.error = 'Docker 命令执行失败';
+          status.errorType = 'UNKNOWN';
+          return status;
+        }
+      }
+    }
+
+    // Fallback: Check docker CLI
     const versionCheck = await this.checkDockerVersion();
     if (!versionCheck.success) {
       status.error = 'Docker 未安装';
@@ -94,12 +132,12 @@ export class DockerDetector {
     status.installed = true;
     status.version = versionCheck.version;
 
-    // 2. 检查 Docker Desktop (macOS/Windows)
+    // Check Docker Desktop (macOS/Windows)
     if (this.platform === 'darwin' || this.platform === 'win32') {
       status.isDesktop = await this.checkDockerDesktop();
     }
 
-    // 3. 检查 Docker Daemon 是否运行
+    // Check Docker Daemon
     const daemonCheck = await this.checkDaemonRunning();
     if (!daemonCheck.success) {
       status.error = 'Docker Daemon 未运行';
@@ -108,7 +146,7 @@ export class DockerDetector {
     }
     status.running = true;
 
-    // 4. 检查用户权限
+    // Check permissions
     const permissionCheck = await this.checkPermissions();
     if (!permissionCheck.success) {
       status.error = this.getPermissionErrorMessage();
@@ -117,18 +155,13 @@ export class DockerDetector {
     }
     status.hasPermission = true;
 
-    // 全部检查通过
     status.available = true;
     return status;
   }
 
-  /**
-   * 检查 Docker 版本
-   */
   private async checkDockerVersion(): Promise<{ success: boolean; version: string | null }> {
     try {
       const { stdout } = await execAsync('docker --version');
-      // 解析版本字符串，例如："Docker version 24.0.7, build afdd53b"
       const versionMatch = stdout.match(/Docker version ([\d.]+)/);
       const version = versionMatch ? versionMatch[1] : stdout.trim();
       return { success: true, version };
@@ -137,13 +170,9 @@ export class DockerDetector {
     }
   }
 
-  /**
-   * 检查 Docker Desktop 是否运行 (macOS)
-   */
   private async checkDockerDesktop(): Promise<boolean> {
     if (this.platform === 'darwin') {
       try {
-        // 检查 Docker Desktop 应用是否运行
         await execAsync('osascript -e "tell application \\"Docker\\" to get running" 2>/dev/null');
         return true;
       } catch (error) {
@@ -153,7 +182,6 @@ export class DockerDetector {
 
     if (this.platform === 'win32') {
       try {
-        // Windows: 检查 Docker Desktop 进程
         await execAsync('tasklist /FI "IMAGENAME eq Docker Desktop.exe" 2>nul | find /I "Docker Desktop.exe"');
         return true;
       } catch (error) {
@@ -164,9 +192,6 @@ export class DockerDetector {
     return false;
   }
 
-  /**
-   * 检查 Docker Daemon 是否运行
-   */
   private async checkDaemonRunning(): Promise<{ success: boolean }> {
     try {
       await execAsync('docker info');
@@ -176,28 +201,15 @@ export class DockerDetector {
     }
   }
 
-  /**
-   * 检查 Docker 权限
-   */
   private async checkPermissions(): Promise<{ success: boolean }> {
     try {
-      // 尝试运行一个简单的容器来验证权限
-      await execAsync('docker run --rm hello-world', { timeout: 30000 });
+      await execAsync('docker ps');
       return { success: true };
     } catch (error) {
-      // 如果 hello-world 镜像不存在，尝试其他简单命令
-      try {
-        await execAsync('docker ps');
-        return { success: true };
-      } catch (error2) {
-        return { success: false };
-      }
+      return { success: false };
     }
   }
 
-  /**
-   * 获取平台特定的权限错误消息
-   */
   private getPermissionErrorMessage(): string {
     switch (this.platform) {
       case 'linux':
@@ -211,16 +223,10 @@ export class DockerDetector {
     }
   }
 
-  /**
-   * 获取安装引导链接
-   */
   getInstallGuide(): { url: string; title: string } {
     return INSTALL_GUIDES[this.platform] || INSTALL_GUIDES.linux;
   }
 
-  /**
-   * 获取友好的错误提示（用于 UI 显示）
-   */
   getFriendlyErrorMessage(status: DockerStatus): {
     title: string;
     message: string;
@@ -257,8 +263,8 @@ export class DockerDetector {
       case 'NO_PERMISSION':
         return {
           title: 'Docker 权限不足',
-          message: this.getPermissionErrorMessage(),
-          action: '查看解决方案'
+          message: status.error || '无法访问 Docker。请检查权限设置。',
+          action: '查看权限设置'
         };
 
       default:
@@ -269,36 +275,6 @@ export class DockerDetector {
         };
     }
   }
-
-  /**
-   * 快速检测（仅检查是否可用）
-   */
-  async isDockerAvailable(): Promise<boolean> {
-    try {
-      await execAsync('docker --version');
-      await execAsync('docker info');
-      await execAsync('docker ps');
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-}
-
-/**
- * 便捷函数：检测 Docker 环境
- */
-export async function detectDocker(): Promise<DockerStatus> {
-  const detector = new DockerDetector();
-  return detector.detectDocker();
-}
-
-/**
- * 便捷函数：快速检查 Docker 可用性
- */
-export async function isDockerAvailable(): Promise<boolean> {
-  const detector = new DockerDetector();
-  return detector.isDockerAvailable();
 }
 
 export default DockerDetector;

@@ -78,7 +78,8 @@ export function registerDockerIPCHandlers(mainWindow: BrowserWindow) {
     DOCKER_IPC_CHANNELS.IS_DOCKER_AVAILABLE,
     async (): Promise<DockerIPCResponse<boolean>> => {
       try {
-        const available = await detector.isDockerAvailable();
+        const status = await detector.detectDocker();
+        const available = status.available;
         return { success: true, data: available };
       } catch (error: any) {
         return { 

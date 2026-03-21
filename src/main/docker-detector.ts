@@ -87,8 +87,12 @@ export class DockerDetector {
     // 1. 检查 docker 命令是否存在
     const versionCheck = await this.checkDockerVersion();
     if (!versionCheck.success) {
-      status.error = 'Docker 未安装';
+      status.error = versionCheck.error || 'Docker 未安装';
       status.errorType = 'NOT_INSTALLED';
+      // 在 macOS 上，docker 命令可能不在 PATH 中
+      if (this.platform === 'darwin') {
+        status.error += '\n\n提示：请确保 Docker Desktop 已安装，并且 docker 命令在 PATH 中。\n您可以尝试在终端运行 "docker --version" 来验证。';
+      }
       return status;
     }
     status.installed = true;
@@ -102,7 +106,7 @@ export class DockerDetector {
     // 3. 检查 Docker Daemon 是否运行
     const daemonCheck = await this.checkDaemonRunning();
     if (!daemonCheck.success) {
-      status.error = 'Docker Daemon 未运行';
+      status.error = daemonCheck.error || 'Docker Daemon 未运行';
       status.errorType = 'DAEMON_NOT_RUNNING';
       return status;
     }
@@ -125,15 +129,22 @@ export class DockerDetector {
   /**
    * 检查 Docker 版本
    */
-  private async checkDockerVersion(): Promise<{ success: boolean; version: string | null }> {
+  private async checkDockerVersion(): Promise<{ success: boolean; version: string | null; error?: string }> {
     try {
-      const { stdout } = await execAsync('docker --version');
+      const { stdout, stderr } = await execAsync('docker --version');
+      if (stderr && !stdout) {
+        return { success: false, version: null, error: stderr };
+      }
       // 解析版本字符串，例如："Docker version 24.0.7, build afdd53b"
       const versionMatch = stdout.match(/Docker version ([\d.]+)/);
       const version = versionMatch ? versionMatch[1] : stdout.trim();
       return { success: true, version };
-    } catch (error) {
-      return { success: false, version: null };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        version: null, 
+        error: error.message || 'docker command not found' 
+      };
     }
   }
 
@@ -167,12 +178,31 @@ export class DockerDetector {
   /**
    * 检查 Docker Daemon 是否运行
    */
-  private async checkDaemonRunning(): Promise<{ success: boolean }> {
+  private async checkDaemonRunning(): Promise<{ success: boolean; error?: string }> {
     try {
-      await execAsync('docker info');
+      const { stderr } = await execAsync('docker info');
+      if (stderr && stderr.includes('Cannot connect to the Docker daemon')) {
+        return { 
+          success: false, 
+          error: '无法连接到 Docker Daemon。请确保 Docker Desktop 已启动。' 
+        };
+      }
       return { success: true };
-    } catch (error) {
-      return { success: false };
+    } catch (error: any) {
+      const msg = error.message || '';
+      if (msg.includes('Cannot connect to the Docker daemon')) {
+        return { 
+          success: false, 
+          error: 'Docker Daemon 未运行。请启动 Docker Desktop 应用。' 
+        };
+      }
+      if (msg.includes('permission denied')) {
+        return { 
+          success: false, 
+          error: 'Docker 权限不足。请确保当前用户有权限运行 Docker 命令。' 
+        };
+      }
+      return { success: false, error: msg };
     }
   }
 

@@ -6,8 +6,52 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as path from 'path';
 
 const execAsync = promisify(exec);
+
+/**
+ * Get Docker PATH for macOS
+ * Docker Desktop may not be in the default PATH when running from Finder
+ */
+function getDockerPath(): string {
+  const dockerPaths = [
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/bin',
+    '/usr/sbin',
+    '/bin',
+    '/sbin',
+    path.join(os.homedir(), '.docker/cli-plugins'),
+    '/Applications/Docker.app/Contents/Resources/bin'
+  ];
+  
+  const currentPath = process.env.PATH || '';
+  const newPath = [...dockerPaths, currentPath].join(':');
+  return newPath;
+}
+
+/**
+ * Execute command with Docker PATH
+ */
+async function execWithDockerPath(command: string): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    exec(command, {
+      env: {
+        ...process.env,
+        PATH: getDockerPath()
+      },
+      shell: '/bin/bash'
+    }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr || error.message));
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
 
 export interface DockerStatus {
   available: boolean;
@@ -43,7 +87,7 @@ export class DockerDetector {
     if (this.platform === 'darwin') {
       // Try docker CLI first - Docker Desktop adds it to PATH
       try {
-        const { stdout, stderr } = await execAsync('docker --version 2>&1');
+        const { stdout, stderr } = await execWithDockerPath('docker --version 2>&1');
         const fullOutput = stdout + stderr;
         
         if (fullOutput.includes('Docker version')) {
@@ -54,12 +98,12 @@ export class DockerDetector {
           
           // Check if daemon is running by trying docker info
           try {
-            await execAsync('docker info 2>&1');
+            await execWithDockerPath('docker info 2>&1');
             status.running = true;
             
             // Check permissions
             try {
-              await execAsync('docker ps 2>&1');
+              await execWithDockerPath('docker ps 2>&1');
               status.hasPermission = true;
               status.available = true;
               return status;
@@ -97,7 +141,7 @@ export class DockerDetector {
           status.hasPermission = true;
           status.available = true;
           try {
-            const { stdout } = await execAsync('docker --version 2>/dev/null');
+            const { stdout } = await execWithDockerPath('docker --version 2>/dev/null');
             const versionMatch = stdout.match(/Docker version ([\d.]+)/);
             status.version = versionMatch ? versionMatch[1] : 'Docker Desktop';
           } catch (e) {
@@ -124,11 +168,11 @@ export class DockerDetector {
         status.installed = true;
         status.running = true;
         try {
-          const { stdout } = await execAsync('docker --version');
+          const { stdout } = await execWithDockerPath('docker --version');
           const versionMatch = stdout.match(/Docker version ([\d.]+)/);
           status.version = versionMatch ? versionMatch[1] : stdout.trim();
           try {
-            await execAsync('docker ps');
+            await execWithDockerPath('docker ps');
             status.hasPermission = true;
             status.available = true;
             return status;
@@ -147,7 +191,7 @@ export class DockerDetector {
 
     // Fallback: Check docker CLI
     try {
-      const { stdout } = await execAsync('docker --version');
+      const { stdout } = await execWithDockerPath('docker --version');
       const versionMatch = stdout.match(/Docker version ([\d.]+)/);
       status.installed = true;
       status.version = versionMatch ? versionMatch[1] : stdout.trim();
@@ -162,13 +206,13 @@ export class DockerDetector {
 
     if (this.platform === 'darwin' || this.platform === 'win32') {
       try {
-        await execAsync('osascript -e "tell application \\"Docker\\" to get running" 2>/dev/null');
+        await execWithDockerPath('osascript -e "tell application \\"Docker\\" to get running" 2>/dev/null');
         status.isDesktop = true;
       } catch (e) {}
     }
 
     try {
-      await execAsync('docker info');
+      await execWithDockerPath('docker info');
       status.running = true;
     } catch (error) {
       status.error = 'Docker Daemon 未运行';
@@ -180,7 +224,7 @@ export class DockerDetector {
     }
 
     try {
-      await execAsync('docker ps');
+      await execWithDockerPath('docker ps');
       status.hasPermission = true;
     } catch (error) {
       status.error = 'Docker 权限不足';

@@ -8,8 +8,52 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 const execAsync = promisify(exec);
+
+/**
+ * Get Docker PATH for macOS
+ * Docker Desktop may not be in the default PATH when running from Finder
+ */
+function getDockerPath(): string {
+  const dockerPaths = [
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/bin',
+    '/usr/sbin',
+    '/bin',
+    '/sbin',
+    path.join(os.homedir(), '.docker/cli-plugins'),
+    '/Applications/Docker.app/Contents/Resources/bin'
+  ];
+  
+  const currentPath = process.env.PATH || '';
+  const newPath = [...dockerPaths, currentPath].join(':');
+  return newPath;
+}
+
+/**
+ * Execute command with Docker PATH
+ */
+async function execWithDockerPath(command: string): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    exec(command, {
+      env: {
+        ...process.env,
+        PATH: getDockerPath()
+      },
+      shell: '/bin/bash'
+    }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr || error.message));
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
 
 /**
  * 容器状态
@@ -109,10 +153,10 @@ export class DockerManager {
           return { success: true }; // 已在运行
         }
         // 启动已存在的容器
-        await execAsync(`${this.getComposeCommand()} start`);
+        await execWithDockerPath(`${this.getComposeCommand()} start`);
       } else {
         // 创建并启动新容器
-        await execAsync(`${this.getComposeCommand()} up -d`);
+        await execWithDockerPath(`${this.getComposeCommand()} up -d`);
       }
 
       // 等待容器就绪
@@ -132,14 +176,14 @@ export class DockerManager {
    */
   async stopContainer(): Promise<{ success: boolean; error?: string }> {
     try {
-      await execAsync(
+      await execWithDockerPath(
         `${this.getComposeCommand()} stop -t ${this.config.stopGracePeriod}`
       );
       return { success: true };
     } catch (error: any) {
       // 如果正常停止失败，尝试强制停止
       try {
-        await execAsync(`${this.getComposeCommand()} kill`);
+        await execWithDockerPath(`${this.getComposeCommand()} kill`);
         return { success: true };
       } catch (killError: any) {
         return { 
@@ -155,7 +199,7 @@ export class DockerManager {
    */
   async restartContainer(): Promise<{ success: boolean; error?: string }> {
     try {
-      await execAsync(`${this.getComposeCommand()} restart`);
+      await execWithDockerPath(`${this.getComposeCommand()} restart`);
       await this.waitForHealthy();
       return { success: true };
     } catch (error: any) {
@@ -171,7 +215,7 @@ export class DockerManager {
    */
   async removeContainer(): Promise<{ success: boolean; error?: string }> {
     try {
-      await execAsync(`${this.getComposeCommand()} down`);
+      await execWithDockerPath(`${this.getComposeCommand()} down`);
       return { success: true };
     } catch (error: any) {
       return { 
@@ -186,7 +230,7 @@ export class DockerManager {
    */
   async containerExists(): Promise<boolean> {
     try {
-      const { stdout } = await execAsync(
+      const { stdout } = await execWithDockerPath(
         `docker ps -a --format '{{.Names}}' | grep "^${this.config.containerName}$"`
       );
       return stdout.trim() === this.config.containerName;
@@ -200,7 +244,7 @@ export class DockerManager {
    */
   async getContainerInfo(): Promise<ContainerInfo | null> {
     try {
-      const { stdout } = await execAsync(
+      const { stdout } = await execWithDockerPath(
         `docker inspect ${this.config.containerName} --format '{{json .}}'`
       );
       const data = JSON.parse(stdout.trim());
@@ -227,7 +271,7 @@ export class DockerManager {
    */
   async getHealthStatus(): Promise<HealthCheckResult> {
     try {
-      const { stdout } = await execAsync(
+      const { stdout } = await execWithDockerPath(
         `docker inspect ${this.config.containerName} --format '{{json .State.Health}}'`
       );
       const health = JSON.parse(stdout.trim());
@@ -299,7 +343,7 @@ export class DockerManager {
     try {
       // 尝试获取端口配置（简化版本，实际应从 docker-compose 解析）
       const port = process.env.MATRIX_PORT || '8008';
-      const { stdout } = await execAsync(
+      const { stdout } = await execWithDockerPath(
         `curl -s -o /dev/null -w "%{http_code}" http://localhost:${port}/_matrix/client/versions`
       );
       return stdout.trim() === '200';
@@ -328,7 +372,7 @@ export class DockerManager {
     }
 
     try {
-      const { stdout, stderr } = await execAsync(cmd);
+      const { stdout, stderr } = await execWithDockerPath(cmd);
       return stdout + stderr;
     } catch (error: any) {
       // 日志命令可能返回非零退出码，但仍会输出日志
@@ -341,7 +385,7 @@ export class DockerManager {
    */
   async pullLatestImage(): Promise<{ success: boolean; error?: string }> {
     try {
-      await execAsync(`${this.getComposeCommand()} pull`);
+      await execWithDockerPath(`${this.getComposeCommand()} pull`);
       return { success: true };
     } catch (error: any) {
       return { 
@@ -356,8 +400,8 @@ export class DockerManager {
    */
   async isDockerAvailable(): Promise<boolean> {
     try {
-      await execAsync('docker --version');
-      await execAsync('docker info');
+      await execWithDockerPath('docker --version');
+      await execWithDockerPath('docker info');
       return true;
     } catch (error) {
       return false;

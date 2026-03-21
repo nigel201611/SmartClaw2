@@ -79,16 +79,8 @@
     ],
     "mac": {
       "category": "public.app-category.social-networking",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "icon": "build/icons/icon.icns",
+      "target": "dmg",
+      "icon": "build/icons/icon.png",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",

@@ -39,8 +39,50 @@ export class DockerDetector {
       error: null, errorType: null, version: null
     };
 
-    // macOS: Check Docker Desktop socket first (most reliable)
+    // macOS: Check Docker Desktop via CLI first (most reliable for Desktop edition)
     if (this.platform === 'darwin') {
+      // Try docker CLI first - Docker Desktop adds it to PATH
+      try {
+        const { stdout, stderr } = await execAsync('docker --version 2>&1');
+        const fullOutput = stdout + stderr;
+        
+        if (fullOutput.includes('Docker version')) {
+          status.installed = true;
+          status.isDesktop = true;
+          const versionMatch = fullOutput.match(/Docker version ([\d.]+)/);
+          status.version = versionMatch ? versionMatch[1] : 'Docker Desktop';
+          
+          // Check if daemon is running by trying docker info
+          try {
+            await execAsync('docker info 2>&1');
+            status.running = true;
+            
+            // Check permissions
+            try {
+              await execAsync('docker ps 2>&1');
+              status.hasPermission = true;
+              status.available = true;
+              return status;
+            } catch (permError: any) {
+              status.error = 'Docker 权限不足';
+              status.errorType = 'NO_PERMISSION';
+              status.hasPermission = false;
+              return status;
+            }
+          } catch (daemonError: any) {
+            status.running = false;
+            status.error = 'Docker Desktop 未运行';
+            status.errorType = 'DAEMON_NOT_RUNNING';
+            status.error += '\n\n请打开 Docker Desktop 应用程序并等待其完全启动。\n';
+            status.error += '提示：在 Spotlight 中搜索 "Docker" 并打开它。';
+            return status;
+          }
+        }
+      } catch (cliError: any) {
+        // docker CLI not found, continue to socket checks
+      }
+      
+      // Fallback: Check Docker socket paths
       const socketPaths = [
         '/var/run/docker.sock',
         `${os.homedir()}/.docker/run/docker.sock`,
@@ -64,6 +106,16 @@ export class DockerDetector {
           return status;
         }
       }
+      
+      // If we get here, Docker is not installed or not running
+      status.error = 'Docker 未安装或未运行';
+      status.errorType = 'NOT_INSTALLED';
+      status.error += '\n\n请在 MacBook 上安装并启动 Docker Desktop：';
+      status.error += '\n1. 访问：https://docs.docker.com/desktop/install-mac/';
+      status.error += '\n2. 下载并安装 Docker Desktop';
+      status.error += '\n3. 打开 Docker Desktop 应用程序';
+      status.error += '\n4. 等待状态栏显示 Docker 图标（绿色表示就绪）';
+      return status;
     }
 
     // Linux: Check Docker socket

@@ -6,7 +6,7 @@
 
 import { app, BrowserWindow, dialog } from 'electron';
 import { DockerDetector, DockerStatus } from './docker-detector';
-import { DockerManager } from './docker-manager';
+import { DockerManager, getDockerComposePath } from './docker-manager';
 import * as path from 'path';
 
 /**
@@ -47,7 +47,7 @@ export class AppStartupManager {
     this.dockerDetector = new DockerDetector();
     this.dockerManager = new DockerManager({
       containerName: 'smartclaw-matrix',
-      composeFilePath: path.join(__dirname, '../../docker-compose.yml'),
+      composeFilePath: getDockerComposePath(),
       startupTimeout: 60000,
       stopGracePeriod: 30
     });

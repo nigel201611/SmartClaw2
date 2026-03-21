@@ -9,8 +9,45 @@ import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { app } from 'electron';
 
 const execAsync = promisify(exec);
+
+/**
+ * Get the path to docker-compose.yml in the app resources
+ * Works in both development and packaged modes
+ */
+export function getDockerComposePath(): string {
+  // In packaged app, resources are in app.getPath('exe')/../Resources/
+  // In development, they're in the project root
+  
+  if (process.resourcesPath) {
+    // Packaged app - use resourcesPath
+    return path.join(process.resourcesPath, 'resources', 'docker-compose.yml');
+  }
+  
+  // Development - use app path
+  const appPath = app.getAppPath();
+  const composePath = path.join(appPath, 'docker-compose.yml');
+  
+  // If file doesn't exist at app path, try relative to __dirname
+  if (!fs.existsSync(composePath)) {
+    return path.join(__dirname, '../../docker-compose.yml');
+  }
+  
+  return composePath;
+}
+
+/**
+ * Get the path to config files in the app resources
+ */
+export function getConfigPath(filename: string): string {
+  if (process.resourcesPath) {
+    return path.join(process.resourcesPath, 'resources', 'config', filename);
+  }
+  const appPath = app.getAppPath();
+  return path.join(appPath, 'config', filename);
+}
 
 /**
  * Get Docker PATH for macOS

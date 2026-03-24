@@ -5,7 +5,27 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { ipcRenderer } from 'electron';
+
+// Access electronAPI from preload script
+declare global {
+  interface Window {
+    electronAPI?: {
+      docker: {
+        detect: () => Promise<any>;
+        isAvailable: () => Promise<any>;
+        startContainer: () => Promise<any>;
+        stopContainer: () => Promise<any>;
+        restartContainer: () => Promise<any>;
+        getContainerInfo: () => Promise<any>;
+        getHealthStatus: () => Promise<any>;
+        getLogs: (options?: { tail?: number }) => Promise<any>;
+        startStatusPolling: (interval: number) => Promise<void>;
+        stopStatusPolling: () => Promise<void>;
+        onStatusUpdate: (callback: (data: any) => void) => void;
+      };
+    };
+  }
+}
 
 /**
  * Docker 状态接口（与 docker-detector.ts 保持一致）
@@ -70,23 +90,6 @@ interface UseDockerReturn {
 }
 
 /**
- * Docker IPC 通道（与 docker-ipc.ts 保持一致）
- */
-const IPC_CHANNELS = {
-  DETECT_DOCKER: 'docker:detect',
-  IS_DOCKER_AVAILABLE: 'docker:is-available',
-  START_CONTAINER: 'docker:start',
-  STOP_CONTAINER: 'docker:stop',
-  RESTART_CONTAINER: 'docker:restart',
-  GET_CONTAINER_INFO: 'docker:container-info',
-  GET_HEALTH_STATUS: 'docker:health-status',
-  GET_LOGS: 'docker:logs',
-  START_STATUS_POLLING: 'docker:start-status-polling',
-  STOP_STATUS_POLLING: 'docker:stop-status-polling',
-  STATUS_UPDATE: 'docker:status-update'
-};
-
-/**
  * useDocker Hook
  */
 export function useDocker(autoDetect: boolean = true): UseDockerReturn {
@@ -110,7 +113,7 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
     setError(null);
     
     try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.DETECT_DOCKER);
+      const result = await window.electronAPI?.docker.detect();
       if (result.success) {
         setDockerStatus(result.data);
         return result.data;
@@ -134,9 +137,8 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
     setError(null);
     
     try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.START_CONTAINER);
+      const result = await window.electronAPI?.docker.startContainer();
       if (result.success) {
-        // 启动成功后刷新状态
         await refreshContainerStatus();
         return true;
       } else {
@@ -159,7 +161,7 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
     setError(null);
     
     try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.STOP_CONTAINER);
+      const result = await window.electronAPI?.docker.stopContainer();
       if (result.success) {
         await refreshContainerStatus();
         return true;
@@ -183,7 +185,7 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
     setError(null);
     
     try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.RESTART_CONTAINER);
+      const result = await window.electronAPI?.docker.restartContainer();
       if (result.success) {
         await refreshContainerStatus();
         return true;
@@ -204,7 +206,7 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
    */
   const getLogs = useCallback(async (tail: number = 100): Promise<string> => {
     try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.GET_LOGS, { tail });
+      const result = await window.electronAPI?.docker.getLogs({ tail });
       if (result.success) {
         return result.data || '';
       } else {
@@ -222,8 +224,8 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
   const refreshContainerStatus = useCallback(async () => {
     try {
       const [infoResult, healthResult] = await Promise.all([
-        ipcRenderer.invoke(IPC_CHANNELS.GET_CONTAINER_INFO),
-        ipcRenderer.invoke(IPC_CHANNELS.GET_HEALTH_STATUS)
+        window.electronAPI?.docker.getContainerInfo(),
+        window.electronAPI?.docker.getHealthStatus()
       ]);
       
       if (infoResult.success) {
@@ -249,7 +251,7 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
     }
     
     // 监听状态更新推送
-    const handleStatusUpdate = (event: any, data: any) => {
+    const handleStatusUpdate = (data: any) => {
       if (data.containerInfo) {
         setContainerInfo(data.containerInfo);
       }
@@ -258,14 +260,13 @@ export function useDocker(autoDetect: boolean = true): UseDockerReturn {
       }
     };
     
-    ipcRenderer.on(IPC_CHANNELS.STATUS_UPDATE, handleStatusUpdate);
+    window.electronAPI?.docker.onStatusUpdate(handleStatusUpdate);
     
     // 启动状态轮询
-    ipcRenderer.invoke(IPC_CHANNELS.START_STATUS_POLLING, 3000);
+    window.electronAPI?.docker.startStatusPolling(3000);
     
     return () => {
-      ipcRenderer.removeListener(IPC_CHANNELS.STATUS_UPDATE, handleStatusUpdate);
-      ipcRenderer.invoke(IPC_CHANNELS.STOP_STATUS_POLLING);
+      window.electronAPI?.docker.stopStatusPolling();
     };
   }, [autoDetect, detectDocker]);
 

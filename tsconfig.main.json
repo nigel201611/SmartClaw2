@@ -17,5 +17,5 @@
     "types": ["node"]
   },
   "include": ["src/main/**/*"],
-  "exclude": ["node_modules", "dist", "src/main/preload.ts"]
+  "exclude": ["node_modules", "dist"]
 }

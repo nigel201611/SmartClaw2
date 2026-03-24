@@ -10,10 +10,9 @@
   "main": "dist/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "node ./node_modules/typescript/bin/tsc -p tsconfig.main.json && node ./node_modules/typescript/bin/tsc -p tsconfig.preload.json && node ./node_modules/vite/bin/vite.js build",
-    "build:main": "node ./node_modules/typescript/bin/tsc -p tsconfig.main.json",
-    "build:preload": "node ./node_modules/typescript/bin/tsc -p tsconfig.preload.json",
-    "build:renderer": "node ./node_modules/vite/bin/vite.js build",
+    "build": "npm run build:main && npm run build:renderer",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "dist:mac": "ARCH=$(uname -m) && if [ \"$ARCH\" = \"arm64\" ]; then electron-builder --mac --arm64; else electron-builder --mac --x64; fi",

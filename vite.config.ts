@@ -18,5 +18,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src/renderer')
     }
+  },
+  // Include global type declarations
+  esbuild: {
+    loader: 'tsx',
+    include: /src\/renderer\/.*\.tsx?$/,
   }
 });

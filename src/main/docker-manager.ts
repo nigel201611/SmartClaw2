@@ -187,12 +187,33 @@ export class DockerManager {
   }
 
   /**
+   * Create .env file for docker-compose to read environment variables
+   */
+  private async createEnvFile(): Promise<string> {
+    const userDataDir = this.getUserDataDir();
+    const envFilePath = path.join(app.getPath('userData'), 'docker-compose.env');
+    
+    // Ensure directory exists
+    fs.mkdirSync(path.dirname(envFilePath), { recursive: true });
+    
+    // Write environment variables
+    const envContent = `CONDUIT_DATA_DIR=${userDataDir}
+CONDUIT_SERVER_NAME=localhost
+CONDUIT_PORT=6167
+MATRIX_PORT=8008
+`;
+    fs.writeFileSync(envFilePath, envContent);
+    
+    return envFilePath;
+  }
+
+  /**
    * 启动容器
    */
   async startContainer(): Promise<{ success: boolean; error?: string }> {
     try {
-      // 设置数据目录到用户目录（避免 Docker Desktop for Mac 的挂载限制）
-      const userDataDir = this.getUserDataDir();
+      // 创建 .env 文件供 docker-compose 读取环境变量
+      const envFilePath = await this.createEnvFile();
       
       // 检查容器是否已存在
       const exists = await this.containerExists();
@@ -203,14 +224,14 @@ export class DockerManager {
         if (info?.running) {
           return { success: true }; // 已在运行
         }
-        // 启动已存在的容器，设置环境变量
+        // 启动已存在的容器，使用 --env-file 传递环境变量
         await execWithDockerPath(
-          `CONDUIT_DATA_DIR="${userDataDir}" ${this.getComposeCommand()} start`
+          `${this.getComposeCommand()} --env-file "${envFilePath}" start`
         );
       } else {
-        // 创建并启动新容器，设置环境变量
+        // 创建并启动新容器，使用 --env-file 传递环境变量
         await execWithDockerPath(
-          `CONDUIT_DATA_DIR="${userDataDir}" ${this.getComposeCommand()} up -d`
+          `${this.getComposeCommand()} --env-file "${envFilePath}" up -d`
         );
       }
 

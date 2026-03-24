@@ -7,8 +7,8 @@ services:
     ports:
       - "${MATRIX_PORT:-8008}:8008"
     volumes:
-      - ${CONDUIT_DATA_DIR:-./data/conduit}:/var/lib/matrix-conduit
-      - ./config/conduit.toml:/etc/conduit/conduit.toml:ro
+      - ${HOME}/Library/Application Support/SmartClaw/data/conduit:/var/lib/matrix-conduit
+      - ${HOME}/Library/Application Support/SmartClaw/config/conduit.toml:/etc/conduit/conduit.toml:ro
     environment:
       - CONDUIT_CONFIG=/etc/conduit/conduit.toml
     healthcheck:

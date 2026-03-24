@@ -15,7 +15,7 @@
         "build:renderer": "vite build",
         "pack": "electron-builder --dir",
         "dist": "electron-builder",
-        "dist:mac": "rm -rf release && ARCH=$(uname -m) && if [ \"$ARCH\" = \"arm64\" ]; then electron-builder --mac --arm64; else electron-builder --mac --x64; fi",
+        "dist:mac": "yarn build && rm -rf release && ARCH=$(uname -m) && if [ \"$ARCH\" = \"arm64\" ]; then electron-builder --mac --arm64; else electron-builder --mac --x64; fi",
         "dist:mac:universal": "rm -rf release && electron-builder --mac --arm64 --x64",
         "dist:win": "rm -rf release && electron-builder --win",
         "dist:linux": "rm -rf release && electron-builder --linux",

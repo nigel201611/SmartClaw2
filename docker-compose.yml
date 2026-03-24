@@ -7,7 +7,7 @@ services:
     ports:
       - "${MATRIX_PORT:-8008}:8008"
     volumes:
-      - ./data/conduit:/var/lib/matrix-conduit
+      - ${CONDUIT_DATA_DIR:-./data/conduit}:/var/lib/matrix-conduit
       - ./config/conduit.toml:/etc/conduit/conduit.toml:ro
     environment:
       - CONDUIT_CONFIG=/etc/conduit/conduit.toml

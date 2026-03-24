@@ -176,10 +176,24 @@ export class DockerManager {
   }
 
   /**
+   * Get user data directory for Docker volumes
+   * Uses app.getPath('userData') which points to:
+   * - macOS: ~/Library/Application Support/<app-name>
+   * - Windows: %APPDATA%/<app-name>
+   * - Linux: ~/.config/<app-name>
+   */
+  private getUserDataDir(): string {
+    return path.join(app.getPath('userData'), 'data', 'conduit');
+  }
+
+  /**
    * 启动容器
    */
   async startContainer(): Promise<{ success: boolean; error?: string }> {
     try {
+      // 设置数据目录到用户目录（避免 Docker Desktop for Mac 的挂载限制）
+      const userDataDir = this.getUserDataDir();
+      
       // 检查容器是否已存在
       const exists = await this.containerExists();
       
@@ -189,11 +203,15 @@ export class DockerManager {
         if (info?.running) {
           return { success: true }; // 已在运行
         }
-        // 启动已存在的容器
-        await execWithDockerPath(`${this.getComposeCommand()} start`);
+        // 启动已存在的容器，设置环境变量
+        await execWithDockerPath(
+          `CONDUIT_DATA_DIR="${userDataDir}" ${this.getComposeCommand()} start`
+        );
       } else {
-        // 创建并启动新容器
-        await execWithDockerPath(`${this.getComposeCommand()} up -d`);
+        // 创建并启动新容器，设置环境变量
+        await execWithDockerPath(
+          `CONDUIT_DATA_DIR="${userDataDir}" ${this.getComposeCommand()} up -d`
+        );
       }
 
       // 等待容器就绪

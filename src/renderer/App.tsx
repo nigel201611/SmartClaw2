@@ -27,7 +27,7 @@ export function App() {
         return <DockerDetection />;
     }
     if (!state.authenticated) {
-        return <AuthScreen />;
+        return <AuthScreen onAuthenticated={() => setState(prev => ({ ...prev, authenticated: true }))} />;
     }
     return <ChatWindow />;
 }

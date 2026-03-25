@@ -26,16 +26,24 @@ export function getDockerComposePath(): string {
     return path.join(process.resourcesPath, 'resources', 'docker-compose.yml');
   }
   
-  // Development - use app path
-  const appPath = app.getAppPath();
-  const composePath = path.join(appPath, 'docker-compose.yml');
+  // Development - try multiple paths to find docker-compose.yml
+  const possiblePaths = [
+    // 1. Current working directory (when running from project root)
+    path.join(process.cwd(), 'docker-compose.yml'),
+    // 2. Relative to __dirname (compiled JS file location)
+    path.join(__dirname, '../../docker-compose.yml'),
+    // 3. Electron app path (when running via npm start)
+    path.join(app.getAppPath(), 'docker-compose.yml'),
+  ];
   
-  // If file doesn't exist at app path, try relative to __dirname
-  if (!fs.existsSync(composePath)) {
-    return path.join(__dirname, '../../docker-compose.yml');
+  for (const composePath of possiblePaths) {
+    if (fs.existsSync(composePath)) {
+      return composePath;
+    }
   }
   
-  return composePath;
+  // Fallback to __dirname relative path
+  return path.join(__dirname, '../../docker-compose.yml');
 }
 
 /**
@@ -45,8 +53,25 @@ export function getConfigPath(filename: string): string {
   if (process.resourcesPath) {
     return path.join(process.resourcesPath, 'resources', 'config', filename);
   }
-  const appPath = app.getAppPath();
-  return path.join(appPath, 'config', filename);
+  
+  // Development - try multiple paths
+  const possiblePaths = [
+    // 1. Current working directory
+    path.join(process.cwd(), 'config', filename),
+    // 2. Relative to __dirname
+    path.join(__dirname, '../../config', filename),
+    // 3. Electron app path
+    path.join(app.getAppPath(), 'config', filename),
+  ];
+  
+  for (const configPath of possiblePaths) {
+    if (fs.existsSync(configPath)) {
+      return configPath;
+    }
+  }
+  
+  // Fallback to __dirname relative path
+  return path.join(__dirname, '../../config', filename);
 }
 
 /**

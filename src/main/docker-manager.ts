@@ -177,13 +177,14 @@ export class DockerManager {
 
   /**
    * Get user data directory for Docker volumes
-   * Uses app.getPath('userData') which points to:
-   * - macOS: ~/Library/Application Support/<app-name>
-   * - Windows: %APPDATA%/<app-name>
-   * - Linux: ~/.config/<app-name>
+   * Uses ~/.smartclaw instead of app.getPath('userData') to avoid Docker mount issues on macOS
+   * - macOS: ~/.smartclaw/data/conduit (Docker Desktop has access)
+   * - Windows: %USERPROFILE%/.smartclaw/data/conduit
+   * - Linux: ~/.smartclaw/data/conduit
    */
   private getUserDataDir(): string {
-    return path.join(app.getPath('userData'), 'data', 'conduit');
+    const homeDir = os.homedir();
+    return path.join(homeDir, '.smartclaw', 'data', 'conduit');
   }
 
   /**
@@ -191,7 +192,8 @@ export class DockerManager {
    */
   private async createEnvFile(): Promise<string> {
     const userDataDir = this.getUserDataDir();
-    const envFilePath = path.join(app.getPath('userData'), 'docker-compose.env');
+    const homeDir = os.homedir();
+    const envFilePath = path.join(homeDir, '.smartclaw', 'docker-compose.env');
     
     // Ensure directory exists
     fs.mkdirSync(path.dirname(envFilePath), { recursive: true });

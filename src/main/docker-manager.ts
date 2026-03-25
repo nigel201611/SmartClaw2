@@ -177,14 +177,16 @@ export class DockerManager {
 
   /**
    * Get user data directory for Docker volumes
-   * Uses ~/.smartclaw instead of app.getPath('userData') to avoid Docker mount issues on macOS
-   * - macOS: ~/.smartclaw/data/conduit (Docker Desktop has access)
+   * Uses a simple path in user's home directory for better Docker compatibility:
+   * - macOS: ~/.smartclaw/data/conduit (Docker can access by default)
    * - Windows: %USERPROFILE%/.smartclaw/data/conduit
    * - Linux: ~/.smartclaw/data/conduit
    */
   private getUserDataDir(): string {
-    const homeDir = os.homedir();
-    return path.join(homeDir, '.smartclaw', 'data', 'conduit');
+    // Use home directory instead of app.getPath('userData') for better Docker compatibility
+    // app.getPath('userData') on macOS returns ~/Library/Application Support/<app>
+    // which may not be accessible to Docker Desktop by default
+    return path.join(os.homedir(), '.smartclaw', 'data', 'conduit');
   }
 
   /**

@@ -149,6 +149,7 @@
             "shortcutName": "SmartClaw"
         },
         "linux": {
+            "maintainer": "SmartClaw Team <support@smartclaw.io>",
             "target": [
                 {
                     "target": "AppImage",

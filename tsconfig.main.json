@@ -14,8 +14,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "types": ["node"]
   },
-  "include": ["src/main/**/*", "electron.d.ts"],
+  "include": ["src/main/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -18,28 +18,29 @@ const execAsync = promisify(exec);
  * Works in both development and packaged modes
  */
 export function getDockerComposePath(): string {
-  // Try multiple paths in order for better compatibility
-  
-  // 1. Packaged app - use resourcesPath
+  // Packaged app - use resourcesPath
   if (process.resourcesPath) {
     return path.join(process.resourcesPath, 'resources', 'docker-compose.yml');
   }
   
-  // 2. Development mode - try current working directory first
-  const cwdPath = path.join(process.cwd(), 'docker-compose.yml');
-  if (fs.existsSync(cwdPath)) {
-    return cwdPath;
+  // Development - try multiple paths to find docker-compose.yml
+  const possiblePaths = [
+    // 1. Current working directory (when running from project root)
+    path.join(process.cwd(), 'docker-compose.yml'),
+    // 2. Relative to __dirname (compiled JS file location)
+    path.join(__dirname, '../../docker-compose.yml'),
+    // 3. Electron app path (when running via npm start)
+    path.join(app.getAppPath(), 'docker-compose.yml'),
+  ];
+  
+  for (const composePath of possiblePaths) {
+    if (fs.existsSync(composePath)) {
+      return composePath;
+    }
   }
   
-  // 3. Try relative to __dirname (for compiled dist/main.js)
-  const dirnamePath = path.join(__dirname, '../../docker-compose.yml');
-  if (fs.existsSync(dirnamePath)) {
-    return dirnamePath;
-  }
-  
-  // 4. Fallback to app path (for development with electron .)
-  const appPath = path.join(app.getAppPath(), 'docker-compose.yml');
-  return appPath;
+  // Fallback to __dirname relative path
+  return path.join(__dirname, '../../docker-compose.yml');
 }
 
 /**
@@ -51,20 +52,44 @@ export function getConfigPath(filename: string): string {
     return path.join(process.resourcesPath, 'resources', 'config', filename);
   }
   
-  // Development mode - try current working directory first
-  const cwdPath = path.join(process.cwd(), 'config', filename);
-  if (fs.existsSync(cwdPath)) {
-    return cwdPath;
+  // Development - try multiple paths
+  const possiblePaths = [
+    // 1. Current working directory
+    path.join(process.cwd(), 'config', filename),
+    // 2. Relative to __dirname
+    path.join(__dirname, '../../config', filename),
+    // 3. Electron app path
+    path.join(app.getAppPath(), 'config', filename),
+  ];
+  
+  for (const configPath of possiblePaths) {
+    if (fs.existsSync(configPath)) {
+      return configPath;
+    }
   }
   
-  // Try relative to __dirname
-  const dirnamePath = path.join(__dirname, '../../config', filename);
-  if (fs.existsSync(dirnamePath)) {
-    return dirnamePath;
+  // Fallback
+  return path.join(__dirname, '../../config', filename);
+}
+  
+  // Development - try multiple paths
+  const possiblePaths = [
+    // 1. Current working directory
+    path.join(process.cwd(), 'config', filename),
+    // 2. Relative to __dirname
+    path.join(__dirname, '../../config', filename),
+    // 3. Electron app path
+    path.join(app.getAppPath(), 'config', filename),
+  ];
+  
+  for (const configPath of possiblePaths) {
+    if (fs.existsSync(configPath)) {
+      return configPath;
+    }
   }
   
-  // Fallback to app path
-  return path.join(app.getAppPath(), 'config', filename);
+  // Fallback to __dirname relative path
+  return path.join(__dirname, '../../config', filename);
 }
 
 /**

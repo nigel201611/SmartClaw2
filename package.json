@@ -165,6 +165,7 @@
             ],
             "icon": "build/icons",
             "category": "Network",
+            "maintainer": "SmartClaw Team <support@smartclaw.io>",
             "desktop": {
                 "Name": "SmartClaw",
                 "Comment": "Local Matrix Server Desktop Client",

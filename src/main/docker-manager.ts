@@ -18,35 +18,53 @@ const execAsync = promisify(exec);
  * Works in both development and packaged modes
  */
 export function getDockerComposePath(): string {
-  // In packaged app, resources are in app.getPath('exe')/../Resources/
-  // In development, they're in the project root
+  // Try multiple paths in order for better compatibility
   
+  // 1. Packaged app - use resourcesPath
   if (process.resourcesPath) {
-    // Packaged app - use resourcesPath
     return path.join(process.resourcesPath, 'resources', 'docker-compose.yml');
   }
   
-  // Development - use app path
-  const appPath = app.getAppPath();
-  const composePath = path.join(appPath, 'docker-compose.yml');
-  
-  // If file doesn't exist at app path, try relative to __dirname
-  if (!fs.existsSync(composePath)) {
-    return path.join(__dirname, '../../docker-compose.yml');
+  // 2. Development mode - try current working directory first
+  const cwdPath = path.join(process.cwd(), 'docker-compose.yml');
+  if (fs.existsSync(cwdPath)) {
+    return cwdPath;
   }
   
-  return composePath;
+  // 3. Try relative to __dirname (for compiled dist/main.js)
+  const dirnamePath = path.join(__dirname, '../../docker-compose.yml');
+  if (fs.existsSync(dirnamePath)) {
+    return dirnamePath;
+  }
+  
+  // 4. Fallback to app path (for development with electron .)
+  const appPath = path.join(app.getAppPath(), 'docker-compose.yml');
+  return appPath;
 }
 
 /**
  * Get the path to config files in the app resources
  */
 export function getConfigPath(filename: string): string {
+  // Packaged app - use resourcesPath
   if (process.resourcesPath) {
     return path.join(process.resourcesPath, 'resources', 'config', filename);
   }
-  const appPath = app.getAppPath();
-  return path.join(appPath, 'config', filename);
+  
+  // Development mode - try current working directory first
+  const cwdPath = path.join(process.cwd(), 'config', filename);
+  if (fs.existsSync(cwdPath)) {
+    return cwdPath;
+  }
+  
+  // Try relative to __dirname
+  const dirnamePath = path.join(__dirname, '../../config', filename);
+  if (fs.existsSync(dirnamePath)) {
+    return dirnamePath;
+  }
+  
+  // Fallback to app path
+  return path.join(app.getAppPath(), 'config', filename);
 }
 
 /**

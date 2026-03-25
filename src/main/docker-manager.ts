@@ -1,6 +1,6 @@
 /**
  * SmartClaw Docker Manager
- * 
+ *
  * 管理 Conduit 容器的生命周期：启动、停止、健康检查、日志收集
  */
 
@@ -22,7 +22,7 @@ export function getDockerComposePath(): string {
   if (process.resourcesPath) {
     return path.join(process.resourcesPath, 'resources', 'docker-compose.yml');
   }
-  
+
   // Development - try multiple paths to find docker-compose.yml
   const possiblePaths = [
     // 1. Current working directory (when running from project root)
@@ -32,13 +32,13 @@ export function getDockerComposePath(): string {
     // 3. Electron app path (when running via npm start)
     path.join(app.getAppPath(), 'docker-compose.yml'),
   ];
-  
+
   for (const composePath of possiblePaths) {
     if (fs.existsSync(composePath)) {
       return composePath;
     }
   }
-  
+
   // Fallback to __dirname relative path
   return path.join(__dirname, '../../docker-compose.yml');
 }
@@ -51,7 +51,7 @@ export function getConfigPath(filename: string): string {
   if (process.resourcesPath) {
     return path.join(process.resourcesPath, 'resources', 'config', filename);
   }
-  
+
   // Development - try multiple paths
   const possiblePaths = [
     // 1. Current working directory
@@ -61,34 +61,14 @@ export function getConfigPath(filename: string): string {
     // 3. Electron app path
     path.join(app.getAppPath(), 'config', filename),
   ];
-  
+
   for (const configPath of possiblePaths) {
     if (fs.existsSync(configPath)) {
       return configPath;
     }
   }
-  
+
   // Fallback
-  return path.join(__dirname, '../../config', filename);
-}
-  
-  // Development - try multiple paths
-  const possiblePaths = [
-    // 1. Current working directory
-    path.join(process.cwd(), 'config', filename),
-    // 2. Relative to __dirname
-    path.join(__dirname, '../../config', filename),
-    // 3. Electron app path
-    path.join(app.getAppPath(), 'config', filename),
-  ];
-  
-  for (const configPath of possiblePaths) {
-    if (fs.existsSync(configPath)) {
-      return configPath;
-    }
-  }
-  
-  // Fallback to __dirname relative path
   return path.join(__dirname, '../../config', filename);
 }
 
@@ -106,9 +86,9 @@ function getDockerPath(): string {
     '/bin',
     '/sbin',
     path.join(os.homedir(), '.docker/cli-plugins'),
-    '/Applications/Docker.app/Contents/Resources/bin'
+    '/Applications/Docker.app/Contents/Resources/bin',
   ];
-  
+
   const currentPath = process.env.PATH || '';
   const newPath = [...dockerPaths, currentPath].join(':');
   return newPath;
@@ -119,33 +99,37 @@ function getDockerPath(): string {
  */
 async function execWithDockerPath(command: string): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    exec(command, {
-      env: {
-        ...process.env,
-        PATH: getDockerPath()
+    exec(
+      command,
+      {
+        env: {
+          ...process.env,
+          PATH: getDockerPath(),
+        },
+        shell: '/bin/bash',
       },
-      shell: '/bin/bash'
-    }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr || error.message));
-      } else {
-        resolve({ stdout, stderr });
-      }
-    });
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+        } else {
+          resolve({ stdout, stderr });
+        }
+      },
+    );
   });
 }
 
 /**
  * 容器状态
  */
-export type ContainerState = 
-  | 'not-created'    // 容器未创建
-  | 'created'        // 已创建但未启动
-  | 'running'        // 运行中
-  | 'paused'         // 已暂停
-  | 'restarting'     // 重启中
-  | 'exited'         // 已退出
-  | 'dead';          // 异常终止
+export type ContainerState =
+  | 'not-created' // 容器未创建
+  | 'created' // 已创建但未启动
+  | 'running' // 运行中
+  | 'paused' // 已暂停
+  | 'restarting' // 重启中
+  | 'exited' // 已退出
+  | 'dead'; // 异常终止
 
 /**
  * 容器信息
@@ -203,7 +187,7 @@ export class DockerManager {
       envFilePath: config.envFilePath,
       healthCheckTimeout: config.healthCheckTimeout || 5000,
       startupTimeout: config.startupTimeout || 60000,
-      stopGracePeriod: config.stopGracePeriod || 30
+      stopGracePeriod: config.stopGracePeriod || 30,
     };
   }
 
@@ -239,10 +223,10 @@ export class DockerManager {
     const userDataDir = this.getUserDataDir();
     const homeDir = os.homedir();
     const envFilePath = path.join(homeDir, '.smartclaw', 'docker-compose.env');
-    
+
     // Ensure directory exists
     fs.mkdirSync(path.dirname(envFilePath), { recursive: true });
-    
+
     // Write environment variables
     const envContent = `CONDUIT_DATA_DIR=${userDataDir}
 CONDUIT_SERVER_NAME=localhost
@@ -250,7 +234,7 @@ CONDUIT_PORT=6167
 MATRIX_PORT=8008
 `;
     fs.writeFileSync(envFilePath, envContent);
-    
+
     return envFilePath;
   }
 
@@ -261,10 +245,10 @@ MATRIX_PORT=8008
     try {
       // 创建 .env 文件供 docker-compose 读取环境变量
       const envFilePath = await this.createEnvFile();
-      
+
       // 检查容器是否已存在
       const exists = await this.containerExists();
-      
+
       if (exists) {
         // 容器已存在，检查状态
         const info = await this.getContainerInfo();
@@ -272,24 +256,20 @@ MATRIX_PORT=8008
           return { success: true }; // 已在运行
         }
         // 启动已存在的容器，使用 --env-file 传递环境变量
-        await execWithDockerPath(
-          `${this.getComposeCommand()} --env-file "${envFilePath}" start`
-        );
+        await execWithDockerPath(`${this.getComposeCommand()} --env-file "${envFilePath}" start`);
       } else {
         // 创建并启动新容器，使用 --env-file 传递环境变量
-        await execWithDockerPath(
-          `${this.getComposeCommand()} --env-file "${envFilePath}" up -d`
-        );
+        await execWithDockerPath(`${this.getComposeCommand()} --env-file "${envFilePath}" up -d`);
       }
 
       // 等待容器就绪
       await this.waitForHealthy();
-      
+
       return { success: true };
     } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || '启动容器失败' 
+      return {
+        success: false,
+        error: error.message || '启动容器失败',
       };
     }
   }
@@ -299,9 +279,7 @@ MATRIX_PORT=8008
    */
   async stopContainer(): Promise<{ success: boolean; error?: string }> {
     try {
-      await execWithDockerPath(
-        `${this.getComposeCommand()} stop -t ${this.config.stopGracePeriod}`
-      );
+      await execWithDockerPath(`${this.getComposeCommand()} stop -t ${this.config.stopGracePeriod}`);
       return { success: true };
     } catch (error: any) {
       // 如果正常停止失败，尝试强制停止
@@ -309,9 +287,9 @@ MATRIX_PORT=8008
         await execWithDockerPath(`${this.getComposeCommand()} kill`);
         return { success: true };
       } catch (killError: any) {
-        return { 
-          success: false, 
-          error: killError.message || '停止容器失败' 
+        return {
+          success: false,
+          error: killError.message || '停止容器失败',
         };
       }
     }
@@ -326,9 +304,9 @@ MATRIX_PORT=8008
       await this.waitForHealthy();
       return { success: true };
     } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || '重启容器失败' 
+      return {
+        success: false,
+        error: error.message || '重启容器失败',
       };
     }
   }
@@ -341,9 +319,9 @@ MATRIX_PORT=8008
       await execWithDockerPath(`${this.getComposeCommand()} down`);
       return { success: true };
     } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || '删除容器失败' 
+      return {
+        success: false,
+        error: error.message || '删除容器失败',
       };
     }
   }
@@ -353,9 +331,7 @@ MATRIX_PORT=8008
    */
   async containerExists(): Promise<boolean> {
     try {
-      const { stdout } = await execWithDockerPath(
-        `docker ps -a --format '{{.Names}}' | grep "^${this.config.containerName}$"`
-      );
+      const { stdout } = await execWithDockerPath(`docker ps -a --format '{{.Names}}' | grep "^${this.config.containerName}$"`);
       return stdout.trim() === this.config.containerName;
     } catch (error) {
       return false;
@@ -367,22 +343,18 @@ MATRIX_PORT=8008
    */
   async getContainerInfo(): Promise<ContainerInfo | null> {
     try {
-      const { stdout } = await execWithDockerPath(
-        `docker inspect ${this.config.containerName} --format '{{json .}}'`
-      );
+      const { stdout } = await execWithDockerPath(`docker inspect ${this.config.containerName} --format '{{json .}}'`);
       const data = JSON.parse(stdout.trim());
-      
+
       return {
         name: data.Name?.replace(/^\//, '') || this.config.containerName,
-        state: data.State?.Status as ContainerState || 'exited',
+        state: (data.State?.Status as ContainerState) || 'exited',
         running: data.State?.Running || false,
         status: data.State?.Status || 'unknown',
         createdAt: data.Created || null,
         startedAt: data.State?.StartedAt || null,
-        ports: Object.keys(data.NetworkSettings?.Ports || {}).map(
-          p => `${p}->${data.NetworkSettings.Ports[p]?.[0]?.HostPort || 'unknown'}`
-        ),
-        image: data.Config?.Image || 'unknown'
+        ports: Object.keys(data.NetworkSettings?.Ports || {}).map((p) => `${p}->${data.NetworkSettings.Ports[p]?.[0]?.HostPort || 'unknown'}`),
+        image: data.Config?.Image || 'unknown',
       };
     } catch (error) {
       return null;
@@ -394,17 +366,15 @@ MATRIX_PORT=8008
    */
   async getHealthStatus(): Promise<HealthCheckResult> {
     try {
-      const { stdout } = await execWithDockerPath(
-        `docker inspect ${this.config.containerName} --format '{{json .State.Health}}'`
-      );
+      const { stdout } = await execWithDockerPath(`docker inspect ${this.config.containerName} --format '{{json .State.Health}}'`);
       const health = JSON.parse(stdout.trim());
-      
+
       return {
         healthy: health.Status === 'healthy',
         status: health.Status || 'none',
         failingStreak: health.FailingStreak || 0,
         lastCheck: health.Log?.[health.Log.length - 1]?.End || null,
-        log: health.Log?.slice(-5).map((entry: any) => entry.Output) || []
+        log: health.Log?.slice(-5).map((entry: any) => entry.Output) || [],
       };
     } catch (error) {
       return {
@@ -412,7 +382,7 @@ MATRIX_PORT=8008
         status: 'none',
         failingStreak: 0,
         lastCheck: null,
-        log: []
+        log: [],
       };
     }
   }
@@ -453,9 +423,9 @@ MATRIX_PORT=8008
       }
     }
 
-    return { 
-      success: false, 
-      error: `容器启动超时（${this.config.startupTimeout / 1000}秒）` 
+    return {
+      success: false,
+      error: `容器启动超时（${this.config.startupTimeout / 1000}秒）`,
     };
   }
 
@@ -466,9 +436,7 @@ MATRIX_PORT=8008
     try {
       // 尝试获取端口配置（简化版本，实际应从 docker-compose 解析）
       const port = process.env.MATRIX_PORT || '8008';
-      const { stdout } = await execWithDockerPath(
-        `curl -s -o /dev/null -w "%{http_code}" http://localhost:${port}/_matrix/client/versions`
-      );
+      const { stdout } = await execWithDockerPath(`curl -s -o /dev/null -w "%{http_code}" http://localhost:${port}/_matrix/client/versions`);
       return stdout.trim() === '200';
     } catch (error) {
       return false;
@@ -478,18 +446,14 @@ MATRIX_PORT=8008
   /**
    * 获取容器日志
    */
-  async getLogs(options?: { 
-    tail?: number; 
-    since?: string; 
-    follow?: boolean 
-  }): Promise<string> {
+  async getLogs(options?: { tail?: number; since?: string; follow?: boolean }): Promise<string> {
     const tail = options?.tail || 100;
     let cmd = `${this.getComposeCommand()} logs --tail ${tail}`;
-    
+
     if (options?.since) {
       cmd += ` --since "${options.since}"`;
     }
-    
+
     if (options?.follow) {
       cmd += ' -f';
     }
@@ -511,9 +475,9 @@ MATRIX_PORT=8008
       await execWithDockerPath(`${this.getComposeCommand()} pull`);
       return { success: true };
     } catch (error: any) {
-      return { 
-        success: false, 
-        error: error.message || '拉取镜像失败' 
+      return {
+        success: false,
+        error: error.message || '拉取镜像失败',
       };
     }
   }
@@ -535,7 +499,7 @@ MATRIX_PORT=8008
    * 辅助函数：休眠
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 

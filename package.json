@@ -9,7 +9,7 @@
   "buildVersion": "2026.03.13",
   "main": "dist/main.js",
   "scripts": {
-    "start": "electron . --remote-debugging-port=9222",
+    "start": "NODE_ENV=development electron . --remote-debugging-port=9222",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "tsc -p tsconfig.renderer.json --noEmit && vite build",
@@ -36,6 +36,7 @@
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.9",
+    "@types/matrix-js-sdk": "^11.1.0",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

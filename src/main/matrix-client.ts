@@ -1,6 +1,6 @@
 /**
  * SmartClaw Matrix Client Wrapper
- * 
+ *
  * 基于 matrix-js-sdk 的 Matrix 客户端封装
  * 提供与本地 Conduit 服务器的连接、认证、消息收发等功能
  */
@@ -77,7 +77,7 @@ export class MatrixClientWrapper {
       const opts: ICreateClientOpts = {
         baseUrl: url,
         timelineSupport: true,
-        useAuthorizationHeader: true
+        useAuthorizationHeader: true,
       };
 
       this.client = createClient(opts);
@@ -104,10 +104,10 @@ export class MatrixClientWrapper {
       const response = await this.client.login('m.login.password', {
         identifier: {
           type: 'm.id.user',
-          user: username
+          user: username,
         },
         password,
-        initial_device_display_name: 'SmartClaw Desktop'
+        initial_device_display_name: 'SmartClaw Desktop',
       });
 
       // 保存会话信息
@@ -115,7 +115,7 @@ export class MatrixClientWrapper {
         userId: response.user_id,
         deviceId: response.device_id,
         accessToken: response.access_token,
-        homeserverUrl: this.client.getHomeserverUrl()
+        homeserverUrl: this.client.getHomeserverUrl(),
       };
 
       // 使用访问令牌重新初始化客户端
@@ -125,7 +125,7 @@ export class MatrixClientWrapper {
       return this.session;
     } catch (error: any) {
       console.error('Matrix login failed:', error);
-      
+
       if (error.httpStatus === 401) {
         throw new Error('用户名或密码错误');
       } else if (error.httpStatus === 403) {
@@ -150,7 +150,7 @@ export class MatrixClientWrapper {
         accessToken: session.accessToken,
         userId: session.userId,
         deviceId: session.deviceId,
-        timelineSupport: true
+        timelineSupport: true,
       };
 
       this.client = createClient(opts);
@@ -196,7 +196,7 @@ export class MatrixClientWrapper {
     // 监听房间消息
     (this.client as any).on('Room.timeline', (event: any, room: any, toStartOfTimeline: any) => {
       if (toStartOfTimeline) return; // 忽略历史消息
-      
+
       if (event.getType() === 'm.room.message') {
         const message = this.parseMessage(event);
         this.emit('message', message);
@@ -245,7 +245,7 @@ export class MatrixClientWrapper {
 
     // 启动客户端同步
     this.client.startClient({
-      initialSyncLimit: 100
+      initialSyncLimit: 100,
     });
 
     console.log('Matrix sync started');
@@ -271,11 +271,7 @@ export class MatrixClientWrapper {
   /**
    * 发送格式化消息
    */
-  async sendFormattedMessage(
-    roomId: string,
-    text: string,
-    format: 'plain' | 'html' = 'plain'
-  ): Promise<string> {
+  async sendFormattedMessage(roomId: string, text: string, format: 'plain' | 'html' = 'plain'): Promise<string> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
     }
@@ -283,7 +279,7 @@ export class MatrixClientWrapper {
     try {
       const content: any = {
         msgtype: 'm.text',
-        body: text
+        body: text,
       };
 
       if (format === 'html') {
@@ -308,7 +304,7 @@ export class MatrixClientWrapper {
 
     try {
       const rooms = this.client.getRooms();
-      return rooms.map(room => this.parseRoom(room));
+      return rooms.map((room) => this.parseRoom(room));
     } catch (error: any) {
       throw new Error(`获取房间列表失败：${error.message}`);
     }
@@ -331,12 +327,7 @@ export class MatrixClientWrapper {
   /**
    * 创建房间
    */
-  async createRoom(options?: {
-    name?: string;
-    topic?: string;
-    isDirect?: boolean;
-    invite?: string[];
-  }): Promise<string> {
+  async createRoom(options?: { name?: string; topic?: string; isDirect?: boolean; invite?: string[] }): Promise<string> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
     }
@@ -344,7 +335,7 @@ export class MatrixClientWrapper {
     try {
       const params: any = {
         preset: 'private_chat',
-        ...options
+        ...options,
       };
 
       const response = await this.client.createRoom(params);
@@ -403,8 +394,8 @@ export class MatrixClientWrapper {
       const events = timeline.getEvents().slice(-limit);
 
       return events
-        .filter(event => event.getType() === 'm.room.message')
-        .map(event => this.parseMessage(event))
+        .filter((event) => event.getType() === 'm.room.message')
+        .map((event) => this.parseMessage(event))
         .reverse(); // 最新消息在前
     } catch (error: any) {
       throw new Error(`获取消息历史失败：${error.message}`);
@@ -437,7 +428,7 @@ export class MatrixClientWrapper {
   private emit(event: string, data: any): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
-      listeners.forEach(callback => {
+      listeners.forEach((callback) => {
         try {
           callback(data);
         } catch (error) {
@@ -460,9 +451,9 @@ export class MatrixClientWrapper {
       content: {
         msgtype: content.msgtype || 'm.text',
         body: content.body || '',
-        formatted_body: content.formatted_body
+        formatted_body: content.formatted_body,
       },
-      type: event.getType()
+      type: event.getType(),
     };
   }
 
@@ -471,14 +462,14 @@ export class MatrixClientWrapper {
    */
   private parseRoom(room: any): RoomInfo {
     const lastEvent = room.timeline[room.timeline.length - 1];
-    
+
     return {
       roomId: room.roomId,
       name: room.name || room.roomId,
       topic: (room.currentState as any)?.topic,
       members: room.getJoinedMembers().length,
       isDirect: room.isDirectRoom?.() || false,
-      lastMessage: lastEvent ? this.parseMessage(lastEvent) : undefined
+      lastMessage: lastEvent ? this.parseMessage(lastEvent) : undefined,
     };
   }
 

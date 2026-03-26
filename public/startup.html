@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartClaw - 启动中</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        color: white;
+        overflow: hidden;
+      }
+
+      .container {
+        text-align: center;
+        padding: 40px;
+        width: 100%;
+        max-width: 500px;
+      }
+
+      .logo {
+        font-size: 64px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        animation: fadeIn 0.5s ease;
+      }
+
+      .logo-icon {
+        font-size: 80px;
+        margin-bottom: 10px;
+        display: inline-block;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      .title {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        letter-spacing: 1px;
+      }
+
+      .subtitle {
+        font-size: 14px;
+        opacity: 0.7;
+        margin-bottom: 30px;
+      }
+
+      .status-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 24px;
+        margin: 20px 0;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .status {
+        font-size: 18px;
+        margin-bottom: 20px;
+        font-weight: 500;
+      }
+
+      .status-icon {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #ffc107;
+        margin-right: 10px;
+        animation: blink 1.5s ease-in-out infinite;
+      }
+
+      .status-icon.success {
+        background-color: #4caf50;
+        animation: none;
+      }
+
+      .status-icon.error {
+        background-color: #f44336;
+        animation: none;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 20px 0;
+      }
+
+      .progress-fill {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #4caf50, #8bc34a);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+
+      .message {
+        font-size: 13px;
+        opacity: 0.8;
+        margin-top: 15px;
+        word-break: break-word;
+      }
+
+      .detail {
+        font-size: 11px;
+        opacity: 0.6;
+        margin-top: 8px;
+        font-family: monospace;
+      }
+
+      .docker-status {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 20px;
+        font-size: 12px;
+        text-align: left;
+      }
+
+      .docker-status-item {
+        display: flex;
+        justify-content: space-between;
+        margin: 8px 0;
+        padding: 4px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .docker-status-label {
+        font-weight: 500;
+        opacity: 0.8;
+      }
+
+      .docker-status-value {
+        font-family: monospace;
+      }
+
+      .docker-status-value.success {
+        color: #4caf50;
+      }
+
+      .docker-status-value.error {
+        color: #f44336;
+      }
+
+      .button {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        padding: 8px 20px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-top: 15px;
+        transition: all 0.3s ease;
+      }
+
+      .button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-1px);
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo">
+        <div class="logo-icon">🦞</div>
+        <div class="title">SmartClaw</div>
+        <div class="subtitle">智能矩阵客户端</div>
+      </div>
+
+      <div class="status-card">
+        <div class="status">
+          <span class="status-icon" id="statusIcon"></span>
+          <span id="statusText">正在初始化...</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="message" id="message">准备启动...</div>
+        <div class="detail" id="detail"></div>
+      </div>
+
+      <div id="dockerStatusPanel" class="docker-status hidden">
+        <div style="font-weight: bold; margin-bottom: 12px">🐳 Docker 状态</div>
+        <div class="docker-status-item">
+          <span class="docker-status-label">安装状态</span>
+          <span class="docker-status-value" id="dockerInstalled">检测中...</span>
+        </div>
+        <div class="docker-status-item">
+          <span class="docker-status-label">运行状态</span>
+          <span class="docker-status-value" id="dockerRunning">检测中...</span>
+        </div>
+        <div class="docker-status-item">
+          <span class="docker-status-label">版本信息</span>
+          <span class="docker-status-value" id="dockerVersion">-</span>
+        </div>
+        <button class="button" id="installGuideBtn" style="display: none">📖 查看安装指南</button>
+      </div>
+    </div>
+
+    <script>
+      // 状态映射
+      const stateMessages = {
+        initializing: { text: '正在初始化...', icon: 'blink' },
+        'checking-docker': { text: '检测 Docker 环境...', icon: 'blink' },
+        'starting-containers': { text: '启动 Matrix 容器...', icon: 'blink' },
+        'waiting-healthy': { text: '等待服务就绪...', icon: 'blink' },
+        'initializing-matrix': { text: '连接 Matrix 服务...', icon: 'blink' },
+        ready: { text: '就绪！正在启动应用...', icon: 'success' },
+        error: { text: '启动失败', icon: 'error' },
+      };
+
+      const statusIcon = document.getElementById('statusIcon');
+      const statusText = document.getElementById('statusText');
+      const progressFill = document.getElementById('progressFill');
+      const messageEl = document.getElementById('message');
+      const detailEl = document.getElementById('detail');
+      const dockerStatusPanel = document.getElementById('dockerStatusPanel');
+      const dockerInstalled = document.getElementById('dockerInstalled');
+      const dockerRunning = document.getElementById('dockerRunning');
+      const dockerVersion = document.getElementById('dockerVersion');
+      const installGuideBtn = document.getElementById('installGuideBtn');
+
+      // 更新启动进度
+      function updateProgress(data) {
+        const progress = data.progress || 0;
+        progressFill.style.width = progress + '%';
+        messageEl.textContent = data.message || '处理中...';
+        if (data.detail) {
+          detailEl.textContent = data.detail;
+        }
+
+        // 更新状态样式
+        const stateInfo = stateMessages[data.state] || stateMessages['initializing'];
+        statusText.textContent = stateInfo.text;
+
+        if (stateInfo.icon === 'success') {
+          statusIcon.className = 'status-icon success';
+        } else if (stateInfo.icon === 'error') {
+          statusIcon.className = 'status-icon error';
+        } else {
+          statusIcon.className = 'status-icon';
+        }
+      }
+
+      // 显示 Docker 状态
+      function showDockerStatus(status) {
+        dockerStatusPanel.classList.remove('hidden');
+
+        dockerInstalled.textContent = status.installed ? '✓ 已安装' : '✗ 未安装';
+        dockerInstalled.className = 'docker-status-value ' + (status.installed ? 'success' : 'error');
+
+        dockerRunning.textContent = status.running ? '✓ 运行中' : '✗ 未运行';
+        dockerRunning.className = 'docker-status-value ' + (status.running ? 'success' : 'error');
+
+        if (status.version) {
+          dockerVersion.textContent = status.version;
+        }
+
+        // 显示安装指南按钮
+        if (!status.installed || !status.running) {
+          installGuideBtn.style.display = 'block';
+        }
+      }
+
+      // 显示 Matrix 状态
+      function showMatrixStatus(status) {
+        if (status.status === 'waiting_login') {
+          statusText.textContent = '等待登录';
+          messageEl.textContent = '请在弹出的窗口中登录 Matrix 账号';
+          progressFill.style.width = '85%';
+        } else if (status.status === 'authenticated') {
+          statusText.textContent = '已登录';
+          messageEl.textContent = `欢迎，${status.userId || '用户'}`;
+        } else if (status.status === 'connected') {
+          statusText.textContent = '已连接';
+          messageEl.textContent = 'Matrix 服务已连接';
+        }
+      }
+
+      // 显示错误
+      function showError(error) {
+        statusText.textContent = '启动失败';
+        statusIcon.className = 'status-icon error';
+        messageEl.textContent = error.message || '发生未知错误';
+        if (error.detail) {
+          detailEl.textContent = error.detail;
+        }
+      }
+
+      // 安装指南按钮点击
+      installGuideBtn.addEventListener('click', () => {
+        if (window.electron && window.electron.openGuide) {
+          window.electron.openGuide();
+        }
+      });
+
+      // 监听来自主进程的事件
+      if (window.electron) {
+        window.electron.onStartupProgress(updateProgress);
+        window.electron.onDockerStatus(showDockerStatus);
+        window.electron.onMatrixStatus(showMatrixStatus);
+        window.electron.onStartupError(showError);
+      } else {
+        console.warn('Electron preload not available');
+      }
+
+      // 请求初始状态
+      if (window.electron && window.electron.getStartupState) {
+        window.electron.getStartupState().then((state) => {
+          if (state) updateProgress(state);
+        });
+      }
+    </script>
+  </body>
+</html>

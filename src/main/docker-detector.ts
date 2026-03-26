@@ -24,9 +24,9 @@ function getDockerPath(): string {
     '/bin',
     '/sbin',
     path.join(os.homedir(), '.docker/cli-plugins'),
-    '/Applications/Docker.app/Contents/Resources/bin'
+    '/Applications/Docker.app/Contents/Resources/bin',
   ];
-  
+
   const currentPath = process.env.PATH || '';
   const newPath = [...dockerPaths, currentPath].join(':');
   return newPath;
@@ -37,19 +37,23 @@ function getDockerPath(): string {
  */
 async function execWithDockerPath(command: string): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    exec(command, {
-      env: {
-        ...process.env,
-        PATH: getDockerPath()
+    exec(
+      command,
+      {
+        env: {
+          ...process.env,
+          PATH: getDockerPath(),
+        },
+        shell: '/bin/bash',
       },
-      shell: '/bin/bash'
-    }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr || error.message));
-      } else {
-        resolve({ stdout, stderr });
-      }
-    });
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+        } else {
+          resolve({ stdout, stderr });
+        }
+      },
+    );
   });
 }
 
@@ -69,18 +73,25 @@ export type DockerErrorType = 'NOT_INSTALLED' | 'DAEMON_NOT_RUNNING' | 'NO_PERMI
 const INSTALL_GUIDES: Record<string, { url: string; title: string }> = {
   darwin: { url: 'https://docs.docker.com/desktop/install-mac/', title: 'macOS 安装 Docker Desktop' },
   win32: { url: 'https://docs.docker.com/desktop/install-windows-install/', title: 'Windows 安装 Docker Desktop' },
-  linux: { url: 'https://docs.docker.com/engine/install/', title: 'Linux 安装 Docker Engine' }
+  linux: { url: 'https://docs.docker.com/engine/install/', title: 'Linux 安装 Docker Engine' },
 };
 
 export class DockerDetector {
   private platform: string;
-  constructor() { this.platform = process.platform; }
+  constructor() {
+    this.platform = process.platform;
+  }
 
   async detectDocker(): Promise<DockerStatus> {
     const status: DockerStatus = {
-      available: false, installed: false, running: false,
-      hasPermission: false, isDesktop: false,
-      error: null, errorType: null, version: null
+      available: false,
+      installed: false,
+      running: false,
+      hasPermission: false,
+      isDesktop: false,
+      error: null,
+      errorType: null,
+      version: null,
     };
 
     // macOS: Check Docker Desktop via CLI first (most reliable for Desktop edition)
@@ -89,18 +100,18 @@ export class DockerDetector {
       try {
         const { stdout, stderr } = await execWithDockerPath('docker --version 2>&1');
         const fullOutput = stdout + stderr;
-        
+
         if (fullOutput.includes('Docker version')) {
           status.installed = true;
           status.isDesktop = true;
           const versionMatch = fullOutput.match(/Docker version ([\d.]+)/);
           status.version = versionMatch ? versionMatch[1] : 'Docker Desktop';
-          
+
           // Check if daemon is running by trying docker info
           try {
             await execWithDockerPath('docker info 2>&1');
             status.running = true;
-            
+
             // Check permissions
             try {
               await execWithDockerPath('docker ps 2>&1');
@@ -125,14 +136,10 @@ export class DockerDetector {
       } catch (cliError: any) {
         // docker CLI not found, continue to socket checks
       }
-      
+
       // Fallback: Check Docker socket paths
-      const socketPaths = [
-        '/var/run/docker.sock',
-        `${os.homedir()}/.docker/run/docker.sock`,
-        `${os.homedir()}/.docker/desktop/docker.sock`
-      ];
-      
+      const socketPaths = ['/var/run/docker.sock', `${os.homedir()}/.docker/run/docker.sock`, `${os.homedir()}/.docker/desktop/docker.sock`];
+
       for (const socketPath of socketPaths) {
         if (fs.existsSync(socketPath)) {
           status.installed = true;
@@ -150,7 +157,7 @@ export class DockerDetector {
           return status;
         }
       }
-      
+
       // If we get here, Docker is not installed or not running
       status.error = 'Docker 未安装或未运行';
       status.errorType = 'NOT_INSTALLED';

@@ -15,6 +15,7 @@
       "sourceMaps": true,
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "env": {
+        "NODE_ENV": "development",
         "ELECTRON_ENABLE_LOGGING": "true"
       }
     },

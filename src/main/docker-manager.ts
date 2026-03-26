@@ -37,6 +37,43 @@ export function getDockerComposePath(): string {
   return path.join(__dirname, '../../docker-compose.yml');
 }
 
+/**
+ * 容器状态
+ */
+export type ContainerState =
+  | 'not-created' // 容器未创建
+  | 'created' // 已创建但未启动
+  | 'running' // 运行中
+  | 'paused' // 已暂停
+  | 'restarting' // 重启中
+  | 'exited' // 已退出
+  | 'dead'; // 异常终止
+
+/**
+ * 容器信息
+ */
+export interface ContainerInfo {
+  name: string;
+  state: ContainerState;
+  running: boolean;
+  status: string;
+  createdAt: string;
+  startedAt: string | null;
+  ports: string[];
+  image: string;
+}
+
+/**
+ * 健康检查结果
+ */
+export interface HealthCheckResult {
+  healthy: boolean;
+  status: 'healthy' | 'unhealthy' | 'starting' | 'none';
+  failingStreak: number;
+  lastCheck: string | null;
+  log: string[];
+}
+
 export interface DockerManagerConfig {
   containerName: string;
   composeFilePath: string;

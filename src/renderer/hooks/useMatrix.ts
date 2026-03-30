@@ -1,11 +1,5 @@
-/**
- * SmartClaw React Hook - useMatrix
- * 
- * 用于渲染进程中 Matrix 客户端操作的 React Hook
- */
-
+// src/renderer/hooks/useMatrix.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ipcRenderer } from 'electron';
 
 /**
  * Matrix 会话接口
@@ -59,15 +53,15 @@ interface UseMatrixReturn {
   isLoggedIn: boolean;
   session: MatrixSession | null;
   syncState: SyncState | null;
-  
+
   // 数据
   rooms: RoomInfo[];
   currentRoom: RoomInfo | null;
   messages: MessageContent[];
-  
+
   // 操作函数
-  connect: (homeserverUrl: string) => Promise<boolean>;
-  login: (username: string, password: string) => Promise<boolean>;
+  connect: (homeserverUrl?: string) => Promise<boolean>;
+  login: (username: string, password: string, homeserver?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   sendMessage: (roomId: string, text: string) => Promise<boolean>;
   getRooms: () => Promise<RoomInfo[]>;
@@ -75,45 +69,11 @@ interface UseMatrixReturn {
   createRoom: (options?: { name?: string; isDirect?: boolean }) => Promise<string>;
   joinRoom: (roomIdOrAlias: string) => Promise<RoomInfo>;
   leaveRoom: (roomId: string) => Promise<void>;
-  
-  // 事件回调
-  onMessage?: (message: MessageContent) => void;
-  onRoomUpdate?: (room: RoomInfo) => void;
-  onSyncStateChange?: (state: SyncState) => void;
-  
+
   // 状态
   isLoading: boolean;
   error: string | null;
 }
-
-/**
- * Matrix IPC 通道
- */
-const IPC_CHANNELS = {
-  CONNECT: 'matrix:connect',
-  LOGIN: 'matrix:login',
-  LOGOUT: 'matrix:logout',
-  RESTORE_SESSION: 'matrix:restore-session',
-  GET_SESSION: 'matrix:get-session',
-  IS_LOGGED_IN: 'matrix:is-logged-in',
-  GET_ROOMS: 'matrix:get-rooms',
-  GET_ROOM: 'matrix:get-room',
-  CREATE_ROOM: 'matrix:create-room',
-  JOIN_ROOM: 'matrix:join-room',
-  LEAVE_ROOM: 'matrix:leave-room',
-  SEND_MESSAGE: 'matrix:send-message',
-  SEND_FORMATTED_MESSAGE: 'matrix:send-formatted-message',
-  GET_ROOM_MESSAGES: 'matrix:get-room-messages',
-  SUBSCRIBE_EVENTS: 'matrix:subscribe-events',
-  
-  // 事件
-  LOGGED_IN: 'matrix:logged-in',
-  LOGGED_OUT: 'matrix:logged-out',
-  MESSAGE: 'matrix:message',
-  ROOM: 'matrix:room',
-  SYNC: 'matrix:sync',
-  ERROR: 'matrix:error'
-};
 
 /**
  * useMatrix Hook
@@ -122,32 +82,26 @@ export function useMatrix(options?: {
   autoConnect?: boolean;
   homeserverUrl?: string;
   onMessage?: (message: MessageContent) => void;
-  onRoomUpdate?: (room: RoomInfo) => void;
+  onRoomUpdate?: (rooms: RoomInfo[]) => void;
   onSyncStateChange?: (state: SyncState) => void;
 }): UseMatrixReturn {
-  const {
-    autoConnect = false,
-    homeserverUrl = 'http://localhost:8008',
-    onMessage,
-    onRoomUpdate,
-    onSyncStateChange
-  } = options || {};
+  const { autoConnect = false, homeserverUrl = 'http://localhost:8008', onMessage, onRoomUpdate, onSyncStateChange } = options || {};
 
   // 连接状态
   const [isConnected, setIsConnected] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [session, setSession] = useState<MatrixSession | null>(null);
   const [syncState, setSyncState] = useState<SyncState | null>(null);
-  
+
   // 数据
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [currentRoom, setCurrentRoom] = useState<RoomInfo | null>(null);
   const [messages, setMessages] = useState<MessageContent[]>([]);
-  
+
   // 状态
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // 事件监听引用
   const messageCallbackRef = useRef(onMessage);
   const roomUpdateCallbackRef = useRef(onRoomUpdate);
@@ -167,249 +121,328 @@ export function useMatrix(options?: {
   }, [onSyncStateChange]);
 
   /**
+   * 检查 Electron API 是否可用
+   */
+  const checkElectronAPI = useCallback((): boolean => {
+    if (!window.electronAPI) {
+      const errorMsg = 'Electron API not available. Make sure preload script is loaded.';
+      console.error(errorMsg);
+      setError(errorMsg);
+      return false;
+    }
+    return true;
+  }, []);
+
+  /**
    * 连接服务器
    */
-  const connect = useCallback(async (url: string): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.CONNECT, url);
-      if (result.success) {
+  const connect = useCallback(
+    async (url?: string): Promise<boolean> => {
+      if (!checkElectronAPI()) return false;
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // 使用 preload 中的 connect 方法
+        await window.electronAPI.connect();
         setIsConnected(true);
         return true;
-      } else {
-        setError(result.error);
+      } catch (err: any) {
+        setError(err.message || '连接失败');
         return false;
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      setError(err.message || '连接失败');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [checkElectronAPI],
+  );
 
   /**
    * 登录
    */
-  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.LOGIN, username, password);
-      if (result.success && result.data) {
-        setSession(result.data);
-        setIsLoggedIn(true);
-        return true;
-      } else {
-        setError(result.error);
+  const login = useCallback(
+    async (username: string, password: string, homeserver?: string): Promise<boolean> => {
+      if (!checkElectronAPI()) return false;
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const server = homeserver || homeserverUrl;
+        // 使用 preload 中的 login 方法
+        const result = await window.electronAPI.login(server, username, password);
+
+        if (result && result.userId) {
+          // 构建 session 对象
+          const accessToken = await window.electronAPI.getAccessToken();
+          const sessionData: MatrixSession = {
+            userId: result.userId,
+            deviceId: result.deviceId || 'unknown',
+            accessToken: accessToken || '',
+            homeserverUrl: server,
+          };
+
+          setSession(sessionData);
+          setIsLoggedIn(true);
+
+          // 登录成功后自动连接
+          await window.electronAPI.connect();
+          setIsConnected(true);
+
+          return true;
+        } else {
+          setError(result?.error || '登录失败');
+          return false;
+        }
+      } catch (err: any) {
+        setError(err.message || '登录失败');
         return false;
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      setError(err.message || '登录失败');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [checkElectronAPI, homeserverUrl],
+  );
 
   /**
    * 登出
    */
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (): Promise<void> => {
+    if (!checkElectronAPI()) return;
+
+    setIsLoading(true);
     try {
-      await ipcRenderer.invoke(IPC_CHANNELS.LOGOUT);
+      await window.electronAPI.logout();
       setSession(null);
       setIsLoggedIn(false);
+      setIsConnected(false);
       setRooms([]);
       setMessages([]);
       setCurrentRoom(null);
+      setSyncState(null);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [checkElectronAPI]);
 
   /**
    * 发送消息
    */
-  const sendMessage = useCallback(async (roomId: string, text: string): Promise<boolean> => {
-    try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.SEND_MESSAGE, roomId, text);
-      if (result.success) {
+  const sendMessage = useCallback(
+    async (roomId: string, text: string): Promise<boolean> => {
+      if (!checkElectronAPI()) return false;
+
+      try {
+        const content = {
+          msgtype: 'm.text',
+          body: text,
+        };
+        await window.electronAPI.sendMessage(roomId, content);
         return true;
-      } else {
-        setError(result.error);
+      } catch (err: any) {
+        setError(err.message);
         return false;
       }
-    } catch (err: any) {
-      setError(err.message);
-      return false;
-    }
-  }, []);
+    },
+    [checkElectronAPI],
+  );
 
   /**
    * 获取房间列表
    */
   const getRooms = useCallback(async (): Promise<RoomInfo[]> => {
+    if (!checkElectronAPI()) return [];
+
     try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.GET_ROOMS);
-      if (result.success && result.data) {
-        setRooms(result.data);
-        return result.data;
-      } else {
-        throw new Error(result.error);
-      }
+      const roomsData = await window.electronAPI.getRooms();
+      const formattedRooms: RoomInfo[] = roomsData.map((room: any) => ({
+        roomId: room.roomId,
+        name: room.name || room.roomId,
+        topic: room.topic,
+        members: room.members?.length || 0,
+        isDirect: room.isDirect || false,
+        lastMessage: room.lastMessage,
+      }));
+
+      setRooms(formattedRooms);
+      return formattedRooms;
     } catch (err: any) {
       setError(err.message);
       return [];
     }
-  }, []);
+  }, [checkElectronAPI]);
 
   /**
    * 获取房间消息
    */
-  const getRoomMessages = useCallback(async (roomId: string, limit: number = 50): Promise<MessageContent[]> => {
-    try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.GET_ROOM_MESSAGES, roomId, limit);
-      if (result.success && result.data) {
+  const getRoomMessages = useCallback(
+    async (roomId: string, limit: number = 50): Promise<MessageContent[]> => {
+      if (!checkElectronAPI()) return [];
+
+      try {
+        const messagesData = await window.electronAPI.getRoomMessages(roomId, limit);
+        const formattedMessages: MessageContent[] = messagesData.map((msg: any) => ({
+          roomId: msg.roomId,
+          eventId: msg.eventId,
+          sender: msg.sender,
+          timestamp: msg.timestamp,
+          content: msg.content,
+          type: msg.type,
+        }));
+
         if (roomId === currentRoom?.roomId) {
-          setMessages(result.data);
+          setMessages(formattedMessages);
         }
-        return result.data;
-      } else {
-        throw new Error(result.error);
+        return formattedMessages;
+      } catch (err: any) {
+        setError(err.message);
+        return [];
       }
-    } catch (err: any) {
-      setError(err.message);
-      return [];
-    }
-  }, [currentRoom]);
+    },
+    [currentRoom, checkElectronAPI],
+  );
 
   /**
    * 创建房间
    */
-  const createRoom = useCallback(async (options?: { name?: string; isDirect?: boolean }): Promise<string> => {
-    try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.CREATE_ROOM, options);
-      if (result.success && result.data) {
-        return result.data;
-      } else {
-        throw new Error(result.error);
+  const createRoom = useCallback(
+    async (options?: { name?: string; isDirect?: boolean }): Promise<string> => {
+      if (!checkElectronAPI()) return '';
+
+      try {
+        // 使用 Matrix 的 createRoom 方法
+        // 注意：preload 中没有直接的 createRoom，可能需要通过发送特定消息实现
+        // 这里假设有对应的 IPC 通道，如果没有则需要添加
+        const result = await window.electronAPI.sendMessage('', {
+          type: 'create_room',
+          ...options,
+        });
+        return result.roomId || '';
+      } catch (err: any) {
+        setError(err.message);
+        return '';
       }
-    } catch (err: any) {
-      setError(err.message);
-      return '';
-    }
-  }, []);
+    },
+    [checkElectronAPI],
+  );
 
   /**
    * 加入房间
    */
-  const joinRoom = useCallback(async (roomIdOrAlias: string): Promise<RoomInfo> => {
-    try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.JOIN_ROOM, roomIdOrAlias);
-      if (result.success && result.data) {
-        return result.data;
-      } else {
-        throw new Error(result.error);
+  const joinRoom = useCallback(
+    async (roomIdOrAlias: string): Promise<RoomInfo> => {
+      if (!checkElectronAPI()) throw new Error('Electron API not available');
+
+      try {
+        await window.electronAPI.joinRoom(roomIdOrAlias);
+        // 加入后重新获取房间列表
+        const roomsList = await getRooms();
+        const joinedRoom = roomsList.find((r) => r.roomId === roomIdOrAlias);
+
+        if (!joinedRoom) {
+          throw new Error('Failed to find joined room');
+        }
+
+        return joinedRoom;
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
       }
-    } catch (err: any) {
-      setError(err.message);
-      return null as any;
-    }
-  }, []);
+    },
+    [checkElectronAPI, getRooms],
+  );
 
   /**
    * 离开房间
    */
-  const leaveRoom = useCallback(async (roomId: string): Promise<void> => {
-    try {
-      const result = await ipcRenderer.invoke(IPC_CHANNELS.LEAVE_ROOM, roomId);
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-    } catch (err: any) {
-      setError(err.message);
-    }
-  }, []);
+  const leaveRoom = useCallback(
+    async (roomId: string): Promise<void> => {
+      if (!checkElectronAPI()) return;
 
-  // 自动连接和事件监听
-  useEffect(() => {
-    if (autoConnect && homeserverUrl) {
-      connect(homeserverUrl);
-    }
-
-    // 监听登录事件
-    const handleLoggedIn = (event: any, session: MatrixSession) => {
-      setSession(session);
-      setIsLoggedIn(true);
-    };
-
-    const handleLoggedOut = () => {
-      setSession(null);
-      setIsLoggedIn(false);
-      setRooms([]);
-      setMessages([]);
-    };
-
-    // 监听消息事件
-    const handleMessage = (event: any, message: MessageContent) => {
-      messageCallbackRef.current?.(message);
-    };
-
-    // 监听房间更新
-    const handleRoom = (event: any, room: RoomInfo) => {
-      roomUpdateCallbackRef.current?.(room);
-      setRooms(prev => {
-        const exists = prev.find(r => r.roomId === room.roomId);
-        if (exists) {
-          return prev.map(r => r.roomId === room.roomId ? room : r);
-        } else {
-          return [...prev, room];
+      try {
+        await window.electronAPI.leaveRoom(roomId);
+        // 离开后更新房间列表
+        await getRooms();
+        if (currentRoom?.roomId === roomId) {
+          setCurrentRoom(null);
         }
-      });
-    };
+      } catch (err: any) {
+        setError(err.message);
+      }
+    },
+    [checkElectronAPI, getRooms, currentRoom],
+  );
+
+  // 监听 Matrix 事件
+  useEffect(() => {
+    if (!window.electronAPI) return;
 
     // 监听同步状态
-    const handleSync = (event: any, data: any) => {
-      const state = data.state as SyncState;
-      setSyncState(state);
-      syncStateCallbackRef.current?.(state);
-    };
+    const syncUnsubscribe = window.electronAPI.onMatrixSync((state: string) => {
+      const syncStateValue = state as SyncState;
+      setSyncState(syncStateValue);
+      syncStateCallbackRef.current?.(syncStateValue);
+    });
 
-    // 监听错误
-    const handleError = (event: any, errorData: any) => {
-      setError(errorData.message || '未知错误');
-    };
+    // 监听房间更新
+    const roomsUnsubscribe = window.electronAPI.onRoomUpdate((roomsData: any[]) => {
+      const formattedRooms: RoomInfo[] = roomsData.map((room: any) => ({
+        roomId: room.roomId,
+        name: room.name || room.roomId,
+        topic: room.topic,
+        members: room.members?.length || 0,
+        isDirect: room.isDirect || false,
+        lastMessage: room.lastMessage,
+      }));
+      setRooms(formattedRooms);
+      roomUpdateCallbackRef.current?.(formattedRooms);
+    });
 
-    // 注册监听器
-    ipcRenderer.on(IPC_CHANNELS.LOGGED_IN, handleLoggedIn);
-    ipcRenderer.on(IPC_CHANNELS.LOGGED_OUT, handleLoggedOut);
-    ipcRenderer.on(IPC_CHANNELS.MESSAGE, handleMessage);
-    ipcRenderer.on(IPC_CHANNELS.ROOM, handleRoom);
-    ipcRenderer.on(IPC_CHANNELS.SYNC, handleSync);
-    ipcRenderer.on(IPC_CHANNELS.ERROR, handleError);
+    // 监听消息接收
+    const messageUnsubscribe = window.electronAPI.onMessageReceived((message: any) => {
+      const formattedMessage: MessageContent = {
+        roomId: message.roomId,
+        eventId: message.eventId,
+        sender: message.sender,
+        timestamp: message.timestamp,
+        content: message.content,
+        type: message.type,
+      };
 
-    // 订阅 Matrix 事件
-    ipcRenderer.invoke(IPC_CHANNELS.SUBSCRIBE_EVENTS, [
-      'message',
-      'room',
-      'sync',
-      'error'
-    ]);
+      messageCallbackRef.current?.(formattedMessage);
 
-    // 清理
+      // 如果是当前房间的消息，添加到消息列表
+      if (currentRoom?.roomId === message.roomId) {
+        setMessages((prev) => [...prev, formattedMessage]);
+      }
+    });
+
+    // 监听认证状态
+    const authUnsubscribe = window.electronAPI.onAuthStatus((authenticated: boolean) => {
+      setIsLoggedIn(authenticated);
+      if (!authenticated) {
+        setSession(null);
+        setRooms([]);
+        setMessages([]);
+      }
+    });
+
+    // 自动连接
+    if (autoConnect) {
+      connect(homeserverUrl).catch(console.error);
+    }
+
+    // 清理监听器
     return () => {
-      ipcRenderer.removeListener(IPC_CHANNELS.LOGGED_IN, handleLoggedIn);
-      ipcRenderer.removeListener(IPC_CHANNELS.LOGGED_OUT, handleLoggedOut);
-      ipcRenderer.removeListener(IPC_CHANNELS.MESSAGE, handleMessage);
-      ipcRenderer.removeListener(IPC_CHANNELS.ROOM, handleRoom);
-      ipcRenderer.removeListener(IPC_CHANNELS.SYNC, handleSync);
-      ipcRenderer.removeListener(IPC_CHANNELS.ERROR, handleError);
+      syncUnsubscribe();
+      roomsUnsubscribe();
+      messageUnsubscribe();
+      authUnsubscribe();
     };
-  }, [autoConnect, homeserverUrl, connect]);
+  }, [autoConnect, homeserverUrl, connect, currentRoom]);
 
   return {
     // 连接状态
@@ -417,12 +450,12 @@ export function useMatrix(options?: {
     isLoggedIn,
     session,
     syncState,
-    
+
     // 数据
     rooms,
     currentRoom,
     messages,
-    
+
     // 操作函数
     connect,
     login,
@@ -433,10 +466,10 @@ export function useMatrix(options?: {
     createRoom,
     joinRoom,
     leaveRoom,
-    
+
     // 状态
     isLoading,
-    error
+    error,
   };
 }
 

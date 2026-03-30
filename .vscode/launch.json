@@ -17,7 +17,8 @@
       "env": {
         "NODE_ENV": "development",
         "ELECTRON_ENABLE_LOGGING": "true"
-      }
+      },
+      "preLaunchTask": "start-vite" // 启动前先运行 Vite
     },
     {
       "name": "Debug Renderer Process",

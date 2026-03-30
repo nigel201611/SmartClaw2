@@ -1,14 +1,21 @@
+// .vscode/tasks.json
 {
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "vite:dev",
+      "label": "start-vite",
       "type": "shell",
-      "command": "npm run build && npm start",
-      "problemMatcher": [],
+      "command": "yarn dev:renderer",
       "isBackground": true,
-      "presentation": {
-        "reveal": "never"
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^.*$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "ready in .*ms"
+        }
       }
     }
   ]

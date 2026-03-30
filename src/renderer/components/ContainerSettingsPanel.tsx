@@ -1,11 +1,10 @@
 /**
  * SmartClaw Container Settings Panel (React)
- * 
+ *
  * 容器设置 UI 组件
  */
 
 import React, { useState, useEffect } from 'react';
-import { ipcRenderer } from 'electron';
 
 /**
  * 容器设置接口
@@ -30,6 +29,16 @@ interface SettingsPanelProps {
 }
 
 /**
+ * 安全获取 Electron API
+ */
+const getElectronAPI = (): IElectronAPI => {
+  if (!window.electronAPI) {
+    throw new Error('Electron API not available. Please ensure preload script is loaded correctly.');
+  }
+  return window.electronAPI;
+};
+
+/**
  * 设置面板组件
  */
 export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
@@ -47,14 +56,32 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
   const loadSettings = async () => {
     try {
       setIsLoading(true);
-      const result = await ipcRenderer.invoke('settings:load');
-      if (result.success) {
-        setSettings(result.data);
-      } else {
-        setError(result.error);
-      }
+      const api = getElectronAPI();
+
+      // 使用 preload 中的 settings 方法
+      const settingsData = await api.getSettings();
+      const containerSettings = await api.getContainerSettings();
+
+      // 合并设置
+      const mergedSettings: ContainerSettings = {
+        autoStartOnLaunch: containerSettings?.autoStartOnLaunch ?? settingsData?.autoStartOnLaunch ?? true,
+        autoStopOnQuit: containerSettings?.autoStopOnQuit ?? settingsData?.autoStopOnQuit ?? true,
+        runInBackground: containerSettings?.runInBackground ?? settingsData?.runInBackground ?? false,
+        memoryLimit: containerSettings?.memoryLimit ?? settingsData?.memoryLimit ?? '200MB',
+        cpuLimit: containerSettings?.cpuLimit ?? settingsData?.cpuLimit ?? 1,
+        logLevel: containerSettings?.logLevel ?? settingsData?.logLevel ?? 'info',
+        healthCheckTimeout: containerSettings?.healthCheckTimeout ?? settingsData?.healthCheckTimeout ?? 60,
+        startupTimeout: containerSettings?.startupTimeout ?? settingsData?.startupTimeout ?? 120,
+        portConfig: containerSettings?.portConfig ??
+          settingsData?.portConfig ?? {
+            matrixPort: 8008,
+            autoSelectPort: true,
+          },
+      };
+
+      setSettings(mergedSettings);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || '加载设置失败');
     } finally {
       setIsLoading(false);
     }
@@ -68,15 +95,15 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
       setError(null);
       setSuccess(false);
 
-      const result = await ipcRenderer.invoke('settings:save', settings);
-      if (result.success) {
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      } else {
-        setError(result.error);
-      }
+      const api = getElectronAPI();
+
+      // 使用 preload 中的 settings 方法
+      await api.saveContainerSettings(settings);
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || '保存设置失败');
     } finally {
       setIsSaving(false);
     }
@@ -84,21 +111,34 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
 
   const resetToDefaults = async () => {
     try {
-      const result = await ipcRenderer.invoke('settings:reset');
-      if (result.success) {
-        setSettings(result.data);
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      }
+      const api = getElectronAPI();
+
+      const defaultSettings: ContainerSettings = {
+        autoStartOnLaunch: true,
+        autoStopOnQuit: true,
+        runInBackground: false,
+        memoryLimit: '200MB',
+        cpuLimit: 1,
+        logLevel: 'info',
+        healthCheckTimeout: 60,
+        startupTimeout: 120,
+        portConfig: {
+          matrixPort: 8008,
+          autoSelectPort: true,
+        },
+      };
+
+      // 保存默认设置
+      await api.saveContainerSettings(defaultSettings);
+      setSettings(defaultSettings);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || '重置设置失败');
     }
   };
 
-  const updateSetting = <K extends keyof ContainerSettings>(
-    key: K,
-    value: ContainerSettings[K]
-  ) => {
+  const updateSetting = <K extends keyof ContainerSettings>(key: K, value: ContainerSettings[K]) => {
     if (settings) {
       setSettings({ ...settings, [key]: value });
     }
@@ -127,30 +167,24 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
       <div className="settings-header">
         <h2>容器设置</h2>
         {onClose && (
-          <button className="close-btn" onClick={onClose}>×</button>
+          <button className="close-btn" onClick={onClose}>
+            ×
+          </button>
         )}
       </div>
 
-      {success && (
-        <div className="alert success">设置已保存</div>
-      )}
+      {success && <div className="alert success">设置已保存</div>}
 
-      {error && (
-        <div className="alert error">{error}</div>
-      )}
+      {error && <div className="alert error">{error}</div>}
 
       <div className="settings-content">
         {/* 启动行为 */}
         <section className="settings-section">
           <h3>启动行为</h3>
-          
+
           <div className="setting-item">
             <label>
-              <input
-                type="checkbox"
-                checked={settings.autoStartOnLaunch}
-                onChange={(e) => updateSetting('autoStartOnLaunch', e.target.checked)}
-              />
+              <input type="checkbox" checked={settings.autoStartOnLaunch} onChange={(e) => updateSetting('autoStartOnLaunch', e.target.checked)} />
               <span>应用启动时自动启动容器</span>
             </label>
             <p className="help-text">启动应用时自动启动 Matrix 容器</p>
@@ -158,25 +192,15 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
 
           <div className="setting-item">
             <label>
-              <input
-                type="checkbox"
-                checked={settings.autoStopOnQuit}
-                onChange={(e) => updateSetting('autoStopOnQuit', e.target.checked)}
-              />
+              <input type="checkbox" checked={settings.autoStopOnQuit} onChange={(e) => updateSetting('autoStopOnQuit', e.target.checked)} />
               <span>应用退出时自动停止容器</span>
             </label>
-            <p className="help-text">
-              关闭时自动停止容器以节省资源。取消勾选则容器在后台继续运行。
-            </p>
+            <p className="help-text">关闭时自动停止容器以节省资源。取消勾选则容器在后台继续运行。</p>
           </div>
 
           <div className="setting-item">
             <label>
-              <input
-                type="checkbox"
-                checked={settings.runInBackground}
-                onChange={(e) => updateSetting('runInBackground', e.target.checked)}
-              />
+              <input type="checkbox" checked={settings.runInBackground} onChange={(e) => updateSetting('runInBackground', e.target.checked)} />
               <span>后台运行模式</span>
             </label>
             <p className="help-text">关闭窗口时最小化到系统托盘</p>
@@ -186,13 +210,10 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
         {/* 资源限制 */}
         <section className="settings-section">
           <h3>资源限制</h3>
-          
+
           <div className="setting-item">
             <label>内存限制</label>
-            <select
-              value={settings.memoryLimit}
-              onChange={(e) => updateSetting('memoryLimit', e.target.value)}
-            >
+            <select value={settings.memoryLimit} onChange={(e) => updateSetting('memoryLimit', e.target.value)}>
               <option value="50MB">50 MB</option>
               <option value="100MB">100 MB</option>
               <option value="200MB">200 MB</option>
@@ -204,10 +225,7 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
 
           <div className="setting-item">
             <label>CPU 限制</label>
-            <select
-              value={settings.cpuLimit}
-              onChange={(e) => updateSetting('cpuLimit', parseFloat(e.target.value))}
-            >
+            <select value={settings.cpuLimit} onChange={(e) => updateSetting('cpuLimit', parseFloat(e.target.value))}>
               <option value={0.25}>0.25 核心</option>
               <option value={0.5}>0.5 核心</option>
               <option value={1}>1 核心</option>
@@ -221,28 +239,16 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
         {/* 超时设置 */}
         <section className="settings-section">
           <h3>超时设置</h3>
-          
+
           <div className="setting-item">
             <label>健康检查超时（秒）</label>
-            <input
-              type="number"
-              min={1}
-              max={300}
-              value={settings.healthCheckTimeout}
-              onChange={(e) => updateSetting('healthCheckTimeout', parseInt(e.target.value))}
-            />
+            <input type="number" min={1} max={300} value={settings.healthCheckTimeout} onChange={(e) => updateSetting('healthCheckTimeout', parseInt(e.target.value))} />
             <p className="help-text">健康检查请求的超时时间</p>
           </div>
 
           <div className="setting-item">
             <label>启动超时（秒）</label>
-            <input
-              type="number"
-              min={10}
-              max={600}
-              value={settings.startupTimeout}
-              onChange={(e) => updateSetting('startupTimeout', parseInt(e.target.value))}
-            />
+            <input type="number" min={10} max={600} value={settings.startupTimeout} onChange={(e) => updateSetting('startupTimeout', parseInt(e.target.value))} />
             <p className="help-text">等待容器启动的最大时间</p>
           </div>
         </section>
@@ -250,16 +256,18 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
         {/* 端口配置 */}
         <section className="settings-section">
           <h3>端口配置</h3>
-          
+
           <div className="setting-item">
             <label>
               <input
                 type="checkbox"
                 checked={settings.portConfig.autoSelectPort}
-                onChange={(e) => updateSetting('portConfig', { 
-                  ...settings.portConfig, 
-                  autoSelectPort: e.target.checked 
-                })}
+                onChange={(e) =>
+                  updateSetting('portConfig', {
+                    ...settings.portConfig,
+                    autoSelectPort: e.target.checked,
+                  })
+                }
               />
               <span>自动选择可用端口</span>
             </label>
@@ -274,10 +282,12 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
                 min={1024}
                 max={65535}
                 value={settings.portConfig.matrixPort}
-                onChange={(e) => updateSetting('portConfig', {
-                  ...settings.portConfig,
-                  matrixPort: parseInt(e.target.value)
-                })}
+                onChange={(e) =>
+                  updateSetting('portConfig', {
+                    ...settings.portConfig,
+                    matrixPort: parseInt(e.target.value),
+                  })
+                }
               />
               <p className="help-text">Matrix 服务器监听端口（默认 8008）</p>
             </div>
@@ -287,13 +297,10 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
         {/* 日志级别 */}
         <section className="settings-section">
           <h3>日志级别</h3>
-          
+
           <div className="setting-item">
             <label>日志详细程度</label>
-            <select
-              value={settings.logLevel}
-              onChange={(e) => updateSetting('logLevel', e.target.value as any)}
-            >
+            <select value={settings.logLevel} onChange={(e) => updateSetting('logLevel', e.target.value as any)}>
               <option value="error">仅错误</option>
               <option value="warn">警告及以上</option>
               <option value="info">信息及以上（推荐）</option>
@@ -305,18 +312,10 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
       </div>
 
       <div className="settings-footer">
-        <button 
-          className="btn secondary" 
-          onClick={resetToDefaults}
-          disabled={isSaving}
-        >
+        <button className="btn secondary" onClick={resetToDefaults} disabled={isSaving}>
           恢复默认
         </button>
-        <button 
-          className="btn primary" 
-          onClick={saveSettings}
-          disabled={isSaving}
-        >
+        <button className="btn primary" onClick={saveSettings} disabled={isSaving}>
           {isSaving ? '保存中...' : '保存设置'}
         </button>
       </div>

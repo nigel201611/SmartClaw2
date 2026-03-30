@@ -63,6 +63,7 @@
         padding: 24px;
         margin: 20px 0;
         border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
       }
 
       .status {
@@ -83,6 +84,11 @@
 
       .status-icon.success {
         background-color: #4caf50;
+        animation: none;
+      }
+
+      .status-icon.warning {
+        background-color: #ff9800;
         animation: none;
       }
 
@@ -129,6 +135,7 @@
         margin-top: 20px;
         font-size: 12px;
         text-align: left;
+        transition: all 0.3s ease;
       }
 
       .docker-status-item {
@@ -152,6 +159,10 @@
         color: #4caf50;
       }
 
+      .docker-status-value.warning {
+        color: #ff9800;
+      }
+
       .docker-status-value.error {
         color: #f44336;
       }
@@ -173,6 +184,11 @@
         transform: translateY(-1px);
       }
 
+      .auto-close {
+        animation: fadeOut 0.5s ease forwards;
+        pointer-events: none;
+      }
+
       @keyframes fadeIn {
         from {
           opacity: 0;
@@ -181,6 +197,17 @@
         to {
           opacity: 1;
           transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeOut {
+        from {
+          opacity: 1;
+          transform: scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: scale(0.95);
         }
       }
 
@@ -207,6 +234,14 @@
       .hidden {
         display: none;
       }
+
+      .matrix-info {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 11px;
+        opacity: 0.7;
+      }
     </style>
   </head>
   <body>
@@ -217,7 +252,7 @@
         <div class="subtitle">智能矩阵客户端</div>
       </div>
 
-      <div class="status-card">
+      <div class="status-card" id="statusCard">
         <div class="status">
           <span class="status-icon" id="statusIcon"></span>
           <span id="statusText">正在初始化...</span>
@@ -227,6 +262,7 @@
         </div>
         <div class="message" id="message">准备启动...</div>
         <div class="detail" id="detail"></div>
+        <div class="matrix-info" id="matrixInfo" style="display: none"></div>
       </div>
 
       <div id="dockerStatusPanel" class="docker-status hidden">
@@ -248,15 +284,17 @@
     </div>
 
     <script>
-      // 状态映射
+      console.log('Startup page loaded');
+
+      // 状态映射 - 移除了 waiting_login 状态
       const stateMessages = {
-        initializing: { text: '正在初始化...', icon: 'blink' },
-        'checking-docker': { text: '检测 Docker 环境...', icon: 'blink' },
-        'starting-containers': { text: '启动 Matrix 容器...', icon: 'blink' },
-        'waiting-healthy': { text: '等待服务就绪...', icon: 'blink' },
-        'initializing-matrix': { text: '连接 Matrix 服务...', icon: 'blink' },
-        ready: { text: '就绪！正在启动应用...', icon: 'success' },
-        error: { text: '启动失败', icon: 'error' },
+        initializing: { text: '正在初始化...', icon: 'blink', message: '准备启动环境' },
+        'checking-docker': { text: '检测 Docker 环境...', icon: 'blink', message: '检查 Docker 是否已安装' },
+        'starting-containers': { text: '启动 Matrix 容器...', icon: 'blink', message: '正在启动 Matrix 服务' },
+        'waiting-healthy': { text: '等待服务就绪...', icon: 'blink', message: 'Matrix 服务启动中，请稍候' },
+        'initializing-matrix': { text: '连接 Matrix 服务...', icon: 'blink', message: '正在连接到 Matrix 服务' },
+        ready: { text: '启动完成！', icon: 'success', message: '应用已准备就绪' },
+        error: { text: '启动失败', icon: 'error', message: '启动过程中遇到错误' },
       };
 
       const statusIcon = document.getElementById('statusIcon');
@@ -264,17 +302,27 @@
       const progressFill = document.getElementById('progressFill');
       const messageEl = document.getElementById('message');
       const detailEl = document.getElementById('detail');
+      const matrixInfo = document.getElementById('matrixInfo');
+      const statusCard = document.getElementById('statusCard');
       const dockerStatusPanel = document.getElementById('dockerStatusPanel');
       const dockerInstalled = document.getElementById('dockerInstalled');
       const dockerRunning = document.getElementById('dockerRunning');
       const dockerVersion = document.getElementById('dockerVersion');
       const installGuideBtn = document.getElementById('installGuideBtn');
 
+      let autoCloseTimeout = null;
+
       // 更新启动进度
       function updateProgress(data) {
+        console.log('Progress update:', data);
+
         const progress = data.progress || 0;
         progressFill.style.width = progress + '%';
-        messageEl.textContent = data.message || '处理中...';
+
+        if (data.message) {
+          messageEl.textContent = data.message;
+        }
+
         if (data.detail) {
           detailEl.textContent = data.detail;
         }
@@ -283,10 +331,27 @@
         const stateInfo = stateMessages[data.state] || stateMessages['initializing'];
         statusText.textContent = stateInfo.text;
 
-        if (stateInfo.icon === 'success') {
+        if (data.state === 'ready') {
           statusIcon.className = 'status-icon success';
-        } else if (stateInfo.icon === 'error') {
+          messageEl.textContent = stateInfo.message;
+
+          // 启动完成后，延迟关闭启动窗口
+          if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
+          autoCloseTimeout = setTimeout(() => {
+            console.log('Startup complete, closing splash window');
+            statusCard.classList.add('auto-close');
+            setTimeout(() => {
+              if (window.electronAPI && window.electronAPI.closeStartupWindow) {
+                window.electronAPI.closeStartupWindow();
+              }
+            }, 500);
+          }, 1500);
+        } else if (data.state === 'error') {
           statusIcon.className = 'status-icon error';
+        } else if (stateInfo.icon === 'warning') {
+          statusIcon.className = 'status-icon warning';
+        } else if (stateInfo.icon === 'success') {
+          statusIcon.className = 'status-icon success';
         } else {
           statusIcon.className = 'status-icon';
         }
@@ -294,13 +359,27 @@
 
       // 显示 Docker 状态
       function showDockerStatus(status) {
+        console.log('Docker status:', status);
         dockerStatusPanel.classList.remove('hidden');
 
-        dockerInstalled.textContent = status.installed ? '✓ 已安装' : '✗ 未安装';
-        dockerInstalled.className = 'docker-status-value ' + (status.installed ? 'success' : 'error');
+        if (status.installed) {
+          dockerInstalled.textContent = '✓ 已安装';
+          dockerInstalled.className = 'docker-status-value success';
+        } else {
+          dockerInstalled.textContent = '✗ 未安装';
+          dockerInstalled.className = 'docker-status-value error';
+        }
 
-        dockerRunning.textContent = status.running ? '✓ 运行中' : '✗ 未运行';
-        dockerRunning.className = 'docker-status-value ' + (status.running ? 'success' : 'error');
+        if (status.running) {
+          dockerRunning.textContent = '✓ 运行中';
+          dockerRunning.className = 'docker-status-value success';
+        } else if (status.installed) {
+          dockerRunning.textContent = '⚠ 未运行';
+          dockerRunning.className = 'docker-status-value warning';
+        } else {
+          dockerRunning.textContent = '✗ 未运行';
+          dockerRunning.className = 'docker-status-value error';
+        }
 
         if (status.version) {
           dockerVersion.textContent = status.version;
@@ -309,26 +388,39 @@
         // 显示安装指南按钮
         if (!status.installed || !status.running) {
           installGuideBtn.style.display = 'block';
+          messageEl.textContent = 'Docker 未就绪，请先安装并启动 Docker';
         }
       }
 
-      // 显示 Matrix 状态
+      // 显示 Matrix 状态 - 不再要求登录
       function showMatrixStatus(status) {
-        if (status.status === 'waiting_login') {
-          statusText.textContent = '等待登录';
-          messageEl.textContent = '请在弹出的窗口中登录 Matrix 账号';
-          progressFill.style.width = '85%';
+        console.log('Matrix status:', status);
+
+        if (status.status === 'connected') {
+          matrixInfo.style.display = 'block';
+          matrixInfo.innerHTML = `✅ Matrix 服务已连接<br>${status.message || ''}`;
+          matrixInfo.style.color = '#4caf50';
         } else if (status.status === 'authenticated') {
-          statusText.textContent = '已登录';
-          messageEl.textContent = `欢迎，${status.userId || '用户'}`;
-        } else if (status.status === 'connected') {
-          statusText.textContent = '已连接';
-          messageEl.textContent = 'Matrix 服务已连接';
+          matrixInfo.style.display = 'block';
+          matrixInfo.innerHTML = `🔐 已登录: ${status.userId || '用户'}<br>${status.message || ''}`;
+          matrixInfo.style.color = '#4caf50';
+        } else if (status.status === 'connecting') {
+          matrixInfo.style.display = 'block';
+          matrixInfo.innerHTML = `🔄 ${status.message || '正在连接 Matrix 服务...'}`;
+          matrixInfo.style.color = '#ffc107';
+        } else if (status.status === 'disconnected') {
+          matrixInfo.style.display = 'block';
+          matrixInfo.innerHTML = `⚠️ Matrix 服务未连接<br>请在主界面中登录或检查服务状态`;
+          matrixInfo.style.color = '#ff9800';
+        } else {
+          // 其他状态，不显示额外信息
+          matrixInfo.style.display = 'none';
         }
       }
 
       // 显示错误
       function showError(error) {
+        console.error('Startup error:', error);
         statusText.textContent = '启动失败';
         statusIcon.className = 'status-icon error';
         messageEl.textContent = error.message || '发生未知错误';
@@ -339,27 +431,72 @@
 
       // 安装指南按钮点击
       installGuideBtn.addEventListener('click', () => {
-        if (window.electron && window.electron.openGuide) {
-          window.electron.openGuide();
+        if (window.electronAPI && window.electronAPI.openGuide) {
+          window.electronAPI.openGuide();
         }
       });
 
       // 监听来自主进程的事件
-      if (window.electron) {
-        window.electron.onStartupProgress(updateProgress);
-        window.electron.onDockerStatus(showDockerStatus);
-        window.electron.onMatrixStatus(showMatrixStatus);
-        window.electron.onStartupError(showError);
+      if (window.electronAPI) {
+        console.log('Electron API available');
+
+        // 注册启动进度监听
+        if (window.electronAPI.onStartupProgress) {
+          window.electronAPI.onStartupProgress(updateProgress);
+          console.log('onStartupProgress registered');
+        } else {
+          console.warn('onStartupProgress not available');
+        }
+
+        // 注册 Docker 状态监听
+        if (window.electronAPI.onDockerStatus) {
+          window.electronAPI.onDockerStatus(showDockerStatus);
+          console.log('onDockerStatus registered');
+        } else {
+          console.warn('onDockerStatus not available');
+        }
+
+        // 注册 Matrix 状态监听
+        if (window.electronAPI.onMatrixStatus) {
+          window.electronAPI.onMatrixStatus(showMatrixStatus);
+          console.log('onMatrixStatus registered');
+        } else {
+          console.warn('onMatrixStatus not available');
+        }
+
+        // 注册错误监听
+        if (window.electronAPI.onStartupError) {
+          window.electronAPI.onStartupError(showError);
+          console.log('onStartupError registered');
+        } else {
+          console.warn('onStartupError not available');
+        }
       } else {
-        console.warn('Electron preload not available');
+        console.error('window.electronAPI is not available!');
+        messageEl.textContent = '错误：无法连接到应用主进程';
+        statusText.textContent = '初始化失败';
+        statusIcon.className = 'status-icon error';
       }
 
       // 请求初始状态
-      if (window.electron && window.electron.getStartupState) {
-        window.electron.getStartupState().then((state) => {
-          if (state) updateProgress(state);
-        });
+      if (window.electronAPI && window.electronAPI.getStartupState) {
+        window.electronAPI
+          .getStartupState()
+          .then((state) => {
+            console.log('Initial state:', state);
+            if (state) updateProgress(state);
+          })
+          .catch((err) => {
+            console.error('Failed to get startup state:', err);
+          });
       }
+
+      // 页面卸载时清理定时器
+      window.addEventListener('beforeunload', () => {
+        if (autoCloseTimeout) {
+          clearTimeout(autoCloseTimeout);
+        }
+      });
     </script>
   </body>
 </html>

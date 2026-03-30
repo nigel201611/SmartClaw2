@@ -13,28 +13,23 @@ const execAsync = promisify(exec);
 
 export function getDockerComposePath(): string {
   // Packaged app - use resourcesPath
-  if (process.resourcesPath) {
-    return path.join(process.resourcesPath, 'resources', 'docker-compose.yml');
-  }
+  if (process.env.NODE_ENV === 'development') {
+    const possiblePaths = [
+      // 1. Current working directory (when running from project root)
+      path.join(process.cwd(), 'docker-compose.yml'),
+      // 2. Relative to __dirname (compiled JS file location)
+      path.join(__dirname, '../docker-compose.yml'),
+      // 3. Electron app path (when running via npm start)
+      path.join(app.getAppPath(), 'docker-compose.yml'),
+    ];
 
-  // Development - try multiple paths to find docker-compose.yml
-  const possiblePaths = [
-    // 1. Current working directory (when running from project root)
-    path.join(process.cwd(), 'docker-compose.yml'),
-    // 2. Relative to __dirname (compiled JS file location)
-    path.join(__dirname, '../../docker-compose.yml'),
-    // 3. Electron app path (when running via npm start)
-    path.join(app.getAppPath(), 'docker-compose.yml'),
-  ];
-
-  for (const composePath of possiblePaths) {
-    if (fs.existsSync(composePath)) {
-      return composePath;
+    for (const composePath of possiblePaths) {
+      if (fs.existsSync(composePath)) {
+        return composePath;
+      }
     }
   }
-
-  // Fallback to __dirname relative path
-  return path.join(__dirname, '../../docker-compose.yml');
+  return path.join(process.resourcesPath, 'resources', 'docker-compose.yml');
 }
 
 /**
@@ -119,13 +114,48 @@ export class DockerManager {
   }
 
   /**
+   * 检查容器是否健康
+   * 注意：这个方法需要容器有健康检查配置
+   */
+  async isContainerHealthy(): Promise<boolean> {
+    try {
+      // 先检查容器是否存在且运行中
+      const exists = await this.checkContainerExists();
+      if (!exists) {
+        return false;
+      }
+
+      const isRunning = await this.isContainerRunning();
+      if (!isRunning) {
+        return false;
+      }
+
+      // 检查容器健康状态
+      const command = `docker inspect --format='{{.State.Health.Status}}' ${this.config.containerName} 2>/dev/null || echo "none"`;
+      const { stdout } = await execAsync(command);
+      const healthStatus = stdout.trim();
+
+      // 如果没有健康检查，认为运行中就是健康的
+      if (healthStatus === 'none' || healthStatus === '') {
+        console.log('Container has no health check, assuming healthy');
+        return true;
+      }
+
+      return healthStatus === 'healthy';
+    } catch (error) {
+      console.error('Failed to check container health:', error);
+      // 如果检查失败，假设容器不健康
+      return false;
+    }
+  }
+
+  /**
    * 检查容器是否正在运行
    */
   async isContainerRunning(): Promise<boolean> {
     try {
       const { stdout } = await execAsync(`docker ps --filter "name=${this.config.containerName}" --format "{{.Names}}"`);
       const isRunning = stdout.trim() === this.config.containerName;
-      console.log(`Container ${this.config.containerName} is running: ${isRunning}`);
       return isRunning;
     } catch (error) {
       console.error('Failed to check container running status:', error);

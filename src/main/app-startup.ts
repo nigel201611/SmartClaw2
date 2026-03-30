@@ -20,7 +20,6 @@ export enum StartupState {
   STARTING_CONTAINERS = 'starting-containers',
   WAITING_HEALTHY = 'waiting-healthy',
   INITIALIZING_MATRIX = 'initializing-matrix',
-  WAITING_LOGIN = 'waiting-login',
   READY = 'ready',
   ERROR = 'error',
 }
@@ -49,9 +48,6 @@ export class AppStartupManager {
   private mainWindow: BrowserWindow | null = null;
   private startupWindow: BrowserWindow | null = null;
   private currentState: StartupState = StartupState.INITIALIZING;
-  private loginResolve: (() => void) | null = null;
-  private loginReject: ((reason: Error) => void) | null = null;
-  private loginTimeout: NodeJS.Timeout | null = null;
 
   constructor() {
     this.dockerDetector = new DockerDetector();
@@ -59,7 +55,6 @@ export class AppStartupManager {
     try {
       composePath = getDockerComposePath();
     } catch (error) {
-      console.error('Failed to get docker-compose path:', error);
       composePath = path.join(__dirname, '../../docker-compose.yml');
       console.log('Using fallback path:', composePath);
     }
@@ -80,15 +75,14 @@ export class AppStartupManager {
    */
   async onAppReady(): Promise<StartupResult> {
     try {
-      // 创建启动窗口
       this.createStartupWindow();
+      await new Promise((resolve) => setTimeout(resolve, 500));
       // Step 1: 检测 Docker 环境
       this.currentState = StartupState.CHECKING_DOCKER;
       this.updateStartupProgress('正在检测 Docker 环境...', 10);
       const dockerStatus = await this.dockerDetector.detectDocker();
       this.sendToStartupWindow('docker-status', dockerStatus);
       if (!dockerStatus.installed || !dockerStatus.running) {
-        // Docker 未就绪，显示首次运行向导
         await this.showFirstRunWizard(dockerStatus);
         return {
           success: false,
@@ -101,7 +95,6 @@ export class AppStartupManager {
       // Step 2: 检查并启动容器
       this.currentState = StartupState.STARTING_CONTAINERS;
       this.updateStartupProgress('正在启动 Matrix 容器...', 30);
-
       const containerExists = await this.dockerManager.checkContainerExists();
       const isRunning = containerExists && (await this.dockerManager.isContainerRunning());
 
@@ -120,7 +113,6 @@ export class AppStartupManager {
       // Step 3: 等待容器健康
       this.currentState = StartupState.WAITING_HEALTHY;
       this.updateStartupProgress('等待 Matrix 服务就绪...', 50);
-
       const healthResult = await this.dockerManager.waitForHealthy();
       if (!healthResult.success) {
         await this.showHealthCheckError(healthResult.error);
@@ -134,25 +126,17 @@ export class AppStartupManager {
       // Step 4: 初始化 Matrix 客户端
       this.currentState = StartupState.INITIALIZING_MATRIX;
       this.updateStartupProgress('连接 Matrix 服务...', 70);
-      this.sendToStartupWindow('matrix-status', { status: 'connecting', message: '正在连接 Matrix 服务...' });
+      this.sendToStartupWindow('matrix-status', {
+        status: 'connecting',
+        message: '正在连接 Matrix 服务...',
+      });
 
-      await this.initializeMatrixClient();
-
-      // Step 5: 等待登录（如果需要）
-      if (!this.matrixService?.getStatus().isLoggedIn) {
-        this.currentState = StartupState.WAITING_LOGIN;
-        this.updateStartupProgress('请登录 Matrix 账号', 85);
-        this.sendToStartupWindow('matrix-status', { status: 'waiting_login', message: '请登录 Matrix 账号' });
-        await this.waitForUserLogin();
-      }
-
-      // Step 6: 显示主窗口
+      await this.initializeMatrixClientWithoutLogin();
+      // 关闭启动窗口
       this.currentState = StartupState.READY;
       this.updateStartupProgress('正在启动应用...', 95);
-      await this.createMainWindow();
 
-      // 关闭启动窗口
-      this.closeStartupWindow();
+      await this.createMainWindow();
 
       return {
         success: true,
@@ -161,6 +145,7 @@ export class AppStartupManager {
         matrixStatus: this.matrixService?.getStatus(),
       };
     } catch (error: any) {
+      console.error('Startup error:', error);
       this.currentState = StartupState.ERROR;
       this.sendToStartupWindow('startup-error', { message: error.message, detail: error.stack });
       await this.showGenericError(error.message);
@@ -173,131 +158,95 @@ export class AppStartupManager {
   }
 
   /**
-   * 初始化 Matrix 客户端
+   * 发送认证状态到所有窗口
    */
-  private async initializeMatrixClient(): Promise<void> {
-    console.log('Initializing Matrix client...');
+  private sendAuthStatus(isAuthenticated: boolean): void {
+    console.log('Sending auth status:', isAuthenticated);
 
+    // 发送到主窗口（如果存在）
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send('auth:status', isAuthenticated);
+    }
+
+    // 发送到启动窗口（如果存在）
+    if (this.startupWindow && !this.startupWindow.isDestroyed()) {
+      this.startupWindow.webContents.send('auth:status', isAuthenticated);
+    }
+  }
+
+  /**
+   * 发送消息到主窗口
+   */
+  private sendToMainWindow(channel: string, data: any): void {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      console.log(`Sending to main window: ${channel}`, data);
+      this.mainWindow.webContents.send(channel, data);
+    }
+  }
+
+  /**
+   * 初始化 Matrix 客户端（不强制登录）
+   */
+  private async initializeMatrixClientWithoutLogin(): Promise<void> {
     // 获取 Matrix 服务实例
     this.matrixService = getMatrixService();
-
     // 设置事件处理器
     this.matrixService.setEventHandlers({
       onStatusChange: (status) => {
         console.log('Matrix status changed:', status);
+        // 发送状态到启动窗口
         this.sendToStartupWindow('matrix-status', {
-          status: status.isLoggedIn ? 'authenticated' : 'connected',
+          status: status.isLoggedIn ? 'authenticated' : 'disconnected',
           userId: status.userId,
-          message: status.isLoggedIn ? '已登录' : '已连接',
+          message: status.isLoggedIn ? '已登录' : '未登录',
         });
 
-        // 如果正在等待登录且已登录，完成等待
-        if (this.currentState === StartupState.WAITING_LOGIN && status.isLoggedIn) {
-          this.loginResolve?.();
-        }
+        // 发送状态到主窗口
+        this.sendToMainWindow('matrix-status', {
+          status: status.isLoggedIn ? 'authenticated' : 'disconnected',
+          userId: status.userId,
+          message: status.isLoggedIn ? '已登录' : '未登录',
+        });
+
+        // 发送认证状态
+        this.sendAuthStatus(status.isLoggedIn);
       },
       onSync: (state) => {
         console.log('Matrix sync state:', state);
         this.sendToStartupWindow('matrix-sync', state);
+        this.sendToMainWindow('matrix-sync', state);
       },
       onError: (error) => {
         console.error('Matrix error:', error);
         this.sendToStartupWindow('matrix-error', error.message);
+        this.sendToMainWindow('matrix-error', error.message);
       },
     });
 
     try {
       // 初始化 Matrix 服务（连接到本地 Conduit）
       await this.matrixService.initialize('http://localhost:8008');
-
       const status = this.matrixService.getStatus();
-      console.log('Matrix service status:', status);
-
-      // 如果已登录，直接成功
+      // 如果有保存的凭证，尝试自动登录
       if (status.isLoggedIn) {
-        console.log('Matrix already logged in as:', status.userId);
-        return;
-      }
-
-      // 未登录，检查是否有自动注册配置
-      if (process.env.AUTO_REGISTER_USER === 'true') {
-        await this.autoLoginOrRegister();
-      }
-
-      console.log('Matrix client initialized successfully');
-    } catch (error: any) {
-      console.error('Matrix initialization failed:', error);
-      throw new Error(`Matrix 服务初始化失败：${error.message}`);
-    }
-  }
-
-  /**
-   * 等待用户登录
-   */
-  private async waitForUserLogin(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.loginResolve = resolve;
-      this.loginReject = reject;
-
-      // 设置超时（5分钟）
-      this.loginTimeout = setTimeout(() => {
-        this.loginResolve = null;
-        this.loginReject = null;
-        reject(new Error('登录超时'));
-      }, 300000);
-    });
-  }
-
-  /**
-   * 自动登录或注册
-   */
-  private async autoLoginOrRegister(): Promise<void> {
-    const username = process.env.MATRIX_USERNAME || 'smartclaw_user';
-    const password = process.env.MATRIX_PASSWORD || 'smartclaw123';
-    const registrationToken = process.env.MATRIX_REGISTRATION_TOKEN || 'smartclaw123';
-
-    try {
-      // 尝试登录
-      await this.matrixService!.login({ username, password });
-      console.log('Auto-login successful');
-    } catch (error: any) {
-      // 登录失败，尝试注册
-      if (error.message.includes('用户名或密码错误') || error.message.includes('User not found')) {
-        console.log('User not found, attempting to register...');
-        await this.autoRegister(username, password, registrationToken);
+        console.log('Auto-login successful as:', status.userId);
+        this.sendToStartupWindow('matrix-status', {
+          status: 'authenticated',
+          userId: status.userId,
+          message: `欢迎回来，${status.userId}`,
+        });
       } else {
-        throw error;
+        this.sendToStartupWindow('matrix-status', {
+          status: 'disconnected',
+          message: '请在主界面中登录 Matrix 账号',
+        });
       }
-    }
-  }
-
-  /**
-   * 自动注册
-   */
-  private async autoRegister(username: string, password: string, registrationToken: string): Promise<void> {
-    const client = this.matrixService!.getClient();
-    if (!client) {
-      throw new Error('Matrix client not available');
-    }
-
-    try {
-      // 使用 matrix-js-sdk 的 register 方法
-      const { createClient } = await import('matrix-js-sdk');
-      const tempClient = createClient({
-        baseUrl: 'http://localhost:8008',
-      });
-
-      const response = await tempClient.register(username, password, null, {
-        type: 'm.login.registration_token',
-        session: registrationToken,
-      });
-
-      // 注册成功后使用新凭证登录
-      await this.matrixService!.login({ username, password });
-      console.log('Auto-registration successful');
     } catch (error: any) {
-      console.error('Auto-registration failed:', error);
-      throw new Error(`自动注册失败：${error.message}`);
+      // 用户可以在主界面中手动连接
+      this.sendToStartupWindow('matrix-status', {
+        status: 'disconnected',
+        message: 'Matrix 服务连接失败，请检查服务状态',
+      });
     }
   }
 
@@ -462,101 +411,57 @@ export class AppStartupManager {
    */
   private createStartupWindow(): void {
     if (this.startupWindow && !this.startupWindow.isDestroyed()) {
+      console.log('Startup window already exists');
       return;
     }
 
+    console.log('preload', path.join(__dirname, 'preload.js'));
     this.startupWindow = new BrowserWindow({
       width: 500,
       height: 450,
       frame: false,
-      resizable: false,
       movable: true,
-      minimizable: false,
-      maximizable: false,
-      closable: false,
       alwaysOnTop: true,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
         preload: path.join(__dirname, 'preload.js'),
+        spellcheck: false,
       },
+      show: true,
+    });
+
+    // 监听窗口加载完成
+    this.startupWindow.webContents.on('did-finish-load', () => {
+      console.log('Startup window loaded successfully');
+    });
+
+    // 监听控制台消息（用于调试）
+    this.startupWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      console.log(`[Startup Window] ${message}`);
     });
 
     // 加载启动 HTML
-    const startupHtmlPath = path.join(__dirname, '../../public/startup.html');
+    const startupHtmlPath = path.join(__dirname, '../public/startup.html');
+    console.log('Startup HTML path:', startupHtmlPath);
+
     if (fs.existsSync(startupHtmlPath)) {
       this.startupWindow.loadFile(startupHtmlPath);
-    } else {
-      this.startupWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(this.getInlineStartupHtml())}`);
     }
 
     this.startupWindow.center();
-  }
 
-  /**
-   * 获取内联启动 HTML
-   */
-  private getInlineStartupHtml(): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>SmartClaw 启动中</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            color: white;
-          }
-          .container { text-align: center; padding: 40px; }
-          .logo { font-size: 64px; margin-bottom: 20px; animation: pulse 2s infinite; }
-          .title { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
-          .subtitle { font-size: 14px; opacity: 0.7; margin-bottom: 30px; }
-          .status-card { background: rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; backdrop-filter: blur(10px); }
-          .status { font-size: 18px; margin-bottom: 20px; }
-          .status-icon { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ffc107; margin-right: 10px; animation: blink 1.5s infinite; }
-          .progress-bar { width: 100%; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden; margin: 20px 0; }
-          .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #4caf50, #8bc34a); transition: width 0.3s; }
-          .message { font-size: 13px; opacity: 0.8; margin-top: 15px; }
-          @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-          @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="logo">🦞</div>
-          <div class="title">SmartClaw</div>
-          <div class="subtitle">智能矩阵客户端</div>
-          <div class="status-card">
-            <div class="status"><span class="status-icon"></span><span id="statusText">正在初始化...</span></div>
-            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-            <div class="message" id="message"></div>
-          </div>
-        </div>
-        <script>
-          if (window.electron?.onStartupProgress) {
-            window.electron.onStartupProgress((data) => {
-              document.getElementById('statusText').textContent = data.message;
-              document.getElementById('progressFill').style.width = data.progress + '%';
-              if (data.detail) document.getElementById('message').textContent = data.detail;
-            });
-          }
-        </script>
-      </body>
-      </html>
-    `;
+    // 开发模式下打开 DevTools
+    // if (process.env.NODE_ENV === 'development') {
+    //   this.startupWindow.webContents.openDevTools();
+    // }
   }
 
   /**
    * 更新启动窗口进度
    */
   private updateStartupProgress(message: string, progress: number, detail?: string): void {
+    console.log(`Progress: ${message} (${progress}%)`);
     this.sendToStartupWindow('startup-progress', {
       state: this.currentState,
       message,
@@ -570,7 +475,10 @@ export class AppStartupManager {
    */
   private sendToStartupWindow(channel: string, data: any): void {
     if (this.startupWindow && !this.startupWindow.isDestroyed()) {
+      console.log(`Sending to startup window: ${channel}`, data);
       this.startupWindow.webContents.send(channel, data);
+    } else {
+      console.warn(`Startup window not available for channel: ${channel}`);
     }
   }
 
@@ -578,11 +486,6 @@ export class AppStartupManager {
    * 关闭启动窗口
    */
   private closeStartupWindow(): void {
-    if (this.loginTimeout) {
-      clearTimeout(this.loginTimeout);
-      this.loginTimeout = null;
-    }
-
     if (this.startupWindow && !this.startupWindow.isDestroyed()) {
       this.startupWindow.close();
       this.startupWindow = null;
@@ -608,8 +511,15 @@ export class AppStartupManager {
         nodeIntegration: false,
         contextIsolation: true,
         preload: path.join(__dirname, 'preload.js'),
+        spellcheck: false,
       },
       show: false,
+    });
+
+    this.mainWindow.once('ready-to-show', () => {
+      this.closeStartupWindow();
+      this.mainWindow?.show();
+      this.mainWindow?.focus();
     });
 
     // 加载应用
@@ -626,9 +536,6 @@ export class AppStartupManager {
       }
     }
 
-    this.mainWindow.show();
-    this.mainWindow.focus();
-
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
     });
@@ -637,18 +544,145 @@ export class AppStartupManager {
       event.preventDefault();
       await this.onAppClosing();
     });
+
+    if (process.env.NODE_ENV === 'development') {
+      this.mainWindow.webContents.openDevTools();
+    }
   }
 
   /**
    * 设置 IPC 处理器
    */
   private setupIpcHandlers(): void {
+    console.log('Setting up IPC handlers...');
+
     // 获取启动状态
     ipcMain.handle('startup:get-state', async () => {
+      console.log('IPC: startup:get-state');
       return {
         state: this.currentState,
         message: this.getStateMessage(),
+        progress: this.getCurrentProgress(),
       };
+    });
+
+    // 关闭启动窗口
+    ipcMain.handle('startup:close', async () => {
+      console.log('IPC: startup:close');
+      this.closeStartupWindow();
+      return { success: true };
+    });
+
+    // 打开指南
+    ipcMain.handle('open:guide', async () => {
+      console.log('IPC: open:guide');
+      shell.openExternal('https://docs.docker.com/get-docker/');
+    });
+
+    // 打开注册页面
+    ipcMain.handle('open:registration', async () => {
+      console.log('IPC: open:registration');
+      shell.openExternal('https://matrix.org/docs/guides/registration');
+    });
+
+    // Docker 检查
+    ipcMain.handle('docker:check', async () => {
+      try {
+        const status = await this.dockerDetector.detectDocker();
+        return status;
+      } catch (error: any) {
+        return {
+          installed: false,
+          running: false,
+          error: error.message,
+        };
+      }
+    });
+
+    // 获取容器信息
+    ipcMain.handle('docker:container-info', async () => {
+      try {
+        const info = await this.dockerManager.getContainerInfo();
+        return { success: true, data: info };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message || '获取容器信息失败',
+        };
+      }
+    });
+
+    // 快速可用性检查
+    ipcMain.handle('docker:is-available', async () => {
+      try {
+        const status = await this.dockerDetector.detectDocker();
+        const available = status.installed && status.running;
+        return { success: true, data: available };
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message || 'Docker 可用性检查失败',
+        };
+      }
+    });
+
+    // Docker 容器操作
+    ipcMain.handle('docker:start-container', async () => {
+      console.log('IPC: docker:start-container');
+      return await this.dockerManager.startContainer();
+    });
+
+    ipcMain.handle('docker:stop-container', async () => {
+      return await this.dockerManager.stopContainer();
+    });
+
+    ipcMain.handle('docker:restart-container', async () => {
+      return await this.dockerManager.restartContainer();
+    });
+
+    ipcMain.handle('docker:get-container-status', async () => {
+      const exists = await this.dockerManager.checkContainerExists();
+      const running = exists && (await this.dockerManager.isContainerRunning());
+      const healthy = running && (await this.dockerManager.isContainerHealthy());
+      return { exists, running, healthy };
+    });
+
+    ipcMain.handle('docker:get-container-logs', async () => {
+      return await this.dockerManager.getLogs({ tail: 100 });
+    });
+
+    ipcMain.handle('docker:is-installed', async () => {
+      const status = await this.dockerDetector.detectDocker();
+      return status.installed;
+    });
+
+    ipcMain.handle('docker:get-info', async () => {
+      return await this.dockerDetector.detectDocker();
+    });
+
+    // Conduit 相关
+    ipcMain.handle('docker:start-conduit', async () => {
+      return await this.dockerManager.startContainer();
+    });
+
+    ipcMain.handle('docker:stop-conduit', async () => {
+      return await this.dockerManager.stopContainer();
+    });
+
+    ipcMain.handle('docker:get-conduit-status', async () => {
+      const running = await this.dockerManager.isContainerRunning();
+      const healthy = running && (await this.dockerManager.isContainerHealthy());
+      return { running, healthy };
+    });
+
+    ipcMain.handle('docker:get-conduit-logs', async () => {
+      return await this.dockerManager.getLogs({ tail: 100 });
+    });
+
+    ipcMain.handle('docker:configure', async (event, config) => {
+      const settingsPath = path.join(app.getPath('userData'), 'docker-settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify(config, null, 2));
+      return { success: true };
     });
 
     // Matrix 登录
@@ -659,6 +693,8 @@ export class AppStartupManager {
 
       try {
         const result = await this.matrixService.login(credentials);
+        // 登录成功后发送认证状态
+        this.sendAuthStatus(true);
         return { success: true, session: result };
       } catch (error: any) {
         return { success: false, error: error.message };
@@ -674,6 +710,8 @@ export class AppStartupManager {
     ipcMain.handle('matrix:logout', async () => {
       if (this.matrixService) {
         await this.matrixService.logout();
+        // 登出后发送认证状态
+        this.sendAuthStatus(false);
       }
     });
 
@@ -708,16 +746,22 @@ export class AppStartupManager {
         state: this.currentState,
       };
     });
+  }
 
-    // 重启容器
-    ipcMain.handle('docker:restart', async () => {
-      await this.dockerManager.restartContainer();
-    });
-
-    // 打开指南
-    ipcMain.handle('open:guide', async () => {
-      shell.openExternal('https://docs.docker.com/get-docker/');
-    });
+  /**
+   * 获取当前进度
+   */
+  private getCurrentProgress(): number {
+    const progressMap: Record<StartupState, number> = {
+      [StartupState.INITIALIZING]: 0,
+      [StartupState.CHECKING_DOCKER]: 10,
+      [StartupState.STARTING_CONTAINERS]: 30,
+      [StartupState.WAITING_HEALTHY]: 50,
+      [StartupState.INITIALIZING_MATRIX]: 70,
+      [StartupState.READY]: 95,
+      [StartupState.ERROR]: 100,
+    };
+    return progressMap[this.currentState] || 0;
   }
 
   /**
@@ -730,7 +774,6 @@ export class AppStartupManager {
       [StartupState.STARTING_CONTAINERS]: '启动 Matrix 容器...',
       [StartupState.WAITING_HEALTHY]: '等待服务就绪...',
       [StartupState.INITIALIZING_MATRIX]: '连接 Matrix 服务...',
-      [StartupState.WAITING_LOGIN]: '请登录 Matrix 账号',
       [StartupState.READY]: '就绪',
       [StartupState.ERROR]: '启动失败',
     };
@@ -790,11 +833,6 @@ export class AppStartupManager {
    * 清理资源
    */
   private cleanup(): void {
-    if (this.loginTimeout) {
-      clearTimeout(this.loginTimeout);
-      this.loginTimeout = null;
-    }
-
     if (this.matrixService) {
       this.matrixService.logout().catch(console.error);
       this.matrixService = null;
@@ -803,6 +841,24 @@ export class AppStartupManager {
     // 清理 IPC 处理器
     const handlers = [
       'startup:get-state',
+      'startup:close',
+      'open:guide',
+      'open:registration',
+      'docker:check',
+      'docker:start-container',
+      'docker:stop-container',
+      'docker:restart-container',
+      'docker:get-container-status',
+      'docker:get-container-logs',
+      'docker:container-info',
+      'docker:is-available',
+      'docker:is-installed',
+      'docker:get-info',
+      'docker:start-conduit',
+      'docker:stop-conduit',
+      'docker:get-conduit-status',
+      'docker:get-conduit-logs',
+      'docker:configure',
       'matrix:login',
       'matrix:get-status',
       'matrix:logout',
@@ -811,8 +867,6 @@ export class AppStartupManager {
       'matrix:create-room',
       'matrix:get-messages',
       'docker:get-status',
-      'docker:restart',
-      'open:guide',
     ];
 
     handlers.forEach((handler) => {

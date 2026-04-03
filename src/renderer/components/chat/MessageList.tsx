@@ -1,103 +1,82 @@
-/**
- * SmartClaw Message List Component
- * 
- * 消息列表区域
- */
+// MessageList.tsx
+import React, { forwardRef } from 'react';
 
-import React, { useEffect, useRef } from 'react';
-import { MessageContent } from '../../hooks/useMatrix';
-import { MessageItem } from './MessageItem';
-
-interface MessageListProps {
-  messages: MessageContent[];
-  currentUserId?: string | null;
-  isLoading?: boolean;
+// 定义组件内部使用的消息类型
+export interface DisplayMessage {
+  id: string;
+  text: string;
+  sender: string;
+  timestamp: Date;
+  isOwn: boolean;
+  eventId?: string;
 }
 
-/**
- * 消息列表组件
- */
-export const MessageList: React.FC<MessageListProps> = ({
-  messages,
-  currentUserId,
-  isLoading
-}) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+interface MessageListProps {
+  messages: DisplayMessage[];
+  currentUserId?: string;
+  isLoading: boolean;
+}
 
-  // 自动滚动到底部
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // 按时间分组消息
-  const groupMessagesByDate = (): Map<string, MessageContent[]> => {
-    const groups = new Map<string, MessageContent[]>();
-    
-    messages.forEach(message => {
-      const date = new Date(message.timestamp).toLocaleDateString('zh-CN');
-      const existing = groups.get(date) || [];
-      existing.push(message);
-      groups.set(date, existing);
-    });
-    
-    return groups;
+export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(({ messages, currentUserId, isLoading }, ref) => {
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const messageGroups = groupMessagesByDate();
+  const getInitials = (sender: string) => {
+    // 从 sender 中提取用户名（Matrix ID 格式：@username:server）
+    const username = sender.split(':')[0].replace('@', '');
+    return username.charAt(0).toUpperCase();
+  };
 
-  // 渲染日期分隔符
-  const renderDateSeparator = (date: string) => (
-    <div className="message-date-separator">
-      <span>{date}</span>
-    </div>
-  );
+  const getDisplayName = (sender: string) => {
+    // 从 sender 中提取用户名
+    return sender.split(':')[0].replace('@', '');
+  };
 
-  // 渲染加载状态
   if (isLoading && messages.length === 0) {
     return (
-      <div className="message-list loading">
-        <div className="loading-spinner">
-          <div className="spinner" />
-          <p>加载消息中...</p>
+      <div className="message-list">
+        <div className="message-loading">
+          <div className="loading-spinner"></div>
         </div>
       </div>
     );
   }
 
-  // 渲染空状态
-  if (messages.length === 0) {
+  if (messages.length === 0 && !isLoading) {
     return (
-      <div className="message-list empty">
-        <div className="empty-content">
-          <div className="empty-icon">💬</div>
-          <p>暂无消息</p>
-          <p className="hint">发送第一条消息开始聊天</p>
+      <div className="message-list">
+        <div className="empty-messages">
+          <p>✨ 暂无消息，发送第一条消息吧！</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="message-list">
-      {Array.from(messageGroups.entries()).map(([date, groupMessages]) => (
-        <div key={date} className="message-group">
-          {renderDateSeparator(date)}
-          {groupMessages.map((message, index) => (
-            <MessageItem
-              key={message.eventId || index}
-              message={message}
-              isOwn={message.sender === currentUserId}
-              showAvatar={
-                index === 0 || 
-                groupMessages[index - 1]?.sender !== message.sender
-              }
-            />
-          ))}
-        </div>
-      ))}
-      <div ref={messagesEndRef} />
+    <div className="message-list" ref={ref}>
+      {messages.map((message, index) => {
+        const isOwn = message.isOwn || message.sender === currentUserId;
+        const showAvatar = index === 0 || messages[index - 1]?.sender !== message.sender;
+
+        return (
+          <div key={message.id || index} className={`message-item ${isOwn ? 'own' : ''}`}>
+            {!isOwn && showAvatar && <div className="message-avatar">{getInitials(message.sender)}</div>}
+            {!isOwn && !showAvatar && <div className="message-avatar" style={{ visibility: 'hidden' }} />}
+            <div className="message-content">
+              {!isOwn && showAvatar && <div className="message-sender-name">{getDisplayName(message.sender)}</div>}
+              <div className="message-bubble">
+                <div className="message-text">{message.text}</div>
+              </div>
+              <div className="message-meta">
+                <span className="message-time">{formatTime(message.timestamp)}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
-};
+});
 
-export default MessageList;
+MessageList.displayName = 'MessageList';

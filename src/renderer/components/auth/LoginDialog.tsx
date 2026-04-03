@@ -1,72 +1,110 @@
-/**
- * SmartClaw Login Dialog Component
- * 
- * 登录对话框
- */
-
-import React, { useState } from 'react';
+// src/renderer/components/auth/LoginDialog.tsx
+import React, { useState, useEffect } from 'react';
 
 interface LoginDialogProps {
   onLogin: (username: string, password: string, homeserverUrl: string, rememberMe: boolean) => Promise<boolean>;
   onSwitchToRegister?: () => void;
   onClose?: () => void;
   defaultHomeserver?: string;
+  error?: string | null;
+  isLoading?: boolean;
 }
 
-/**
- * 登录对话框组件
- */
 export const LoginDialog: React.FC<LoginDialogProps> = ({
   onLogin,
   onSwitchToRegister,
   onClose,
-  defaultHomeserver = 'http://localhost:8008'
+  defaultHomeserver = 'http://localhost:8008',
+  error: externalError,
+  isLoading: externalLoading = false,
 }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [homeserverUrl, setHomeserverUrl] = useState(defaultHomeserver);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+    homeserverUrl: defaultHomeserver,
+    rememberMe: true,
+  });
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState<string | null>(null);
 
-  // 处理登录
+  const isLoading = externalLoading || internalLoading;
+  const error = externalError || internalError;
+
+  // 加载保存的凭证
+  useEffect(() => {
+    const loadSavedCredentials = async () => {
+      try {
+        const savedHomeserver = await window.electronAPI.getHomeserver();
+        const savedUserId = await window.electronAPI.getCurrentUser();
+
+        if (savedHomeserver) {
+          setFormData((prev) => ({ ...prev, homeserverUrl: savedHomeserver }));
+        }
+        if (savedUserId) {
+          // 从 userId 中提取用户名（格式：@username:server）
+          const username = savedUserId.split(':')[0].replace('@', '');
+          setFormData((prev) => ({ ...prev, username }));
+        }
+      } catch (error) {
+        console.error('Failed to load saved credentials:', error);
+      }
+    };
+
+    loadSavedCredentials();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+    // 清除错误
+    if (internalError) setInternalError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setIsLoading(true);
+    setInternalError(null);
+    setInternalLoading(true);
 
     try {
-      // 验证输入
-      if (!username.trim()) {
-        setError('请输入用户名');
-        return;
+      if (!formData.username.trim()) {
+        throw new Error('请输入用户名');
       }
-      if (!password) {
-        setError('请输入密码');
-        return;
+      if (!formData.password) {
+        throw new Error('请输入密码');
+      }
+      if (!formData.homeserverUrl) {
+        throw new Error('请输入服务器地址');
       }
 
-      // 执行登录
-      const success = await onLogin(username.trim(), password, homeserverUrl, rememberMe);
-      
-      if (!success) {
-        setError('登录失败，请检查用户名和密码');
+      // 验证 URL 格式
+      try {
+        new URL(formData.homeserverUrl);
+      } catch {
+        throw new Error('服务器地址格式不正确');
       }
-      // 成功时由父组件处理跳转
+
+      const success = await onLogin(formData.username.trim(), formData.password, formData.homeserverUrl, formData.rememberMe);
+
+      if (!success) {
+        throw new Error('登录失败，请检查用户名和密码');
+      }
     } catch (err: any) {
-      setError(err.message || '登录失败');
+      setInternalError(err.message || '登录失败');
     } finally {
-      setIsLoading(false);
+      setInternalLoading(false);
     }
   };
 
   return (
     <div className="auth-dialog-overlay" onClick={onClose}>
-      <div className="auth-dialog" onClick={e => e.stopPropagation()}>
+      <div className="auth-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="auth-dialog-header">
-          <h1>登录 SmartClaw</h1>
-          <p>连接到您的 Matrix 服务器</p>
+          <h1>欢迎回来</h1>
+          <p>登录以继续使用 SmartClaw</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -78,31 +116,15 @@ export const LoginDialog: React.FC<LoginDialogProps> = ({
           )}
 
           <div className="form-group">
-            <label htmlFor="homeserver">服务器地址</label>
-            <input
-              id="homeserver"
-              type="url"
-              value={homeserverUrl}
-              onChange={e => setHomeserverUrl(e.target.value)}
-              placeholder="http://localhost:8008"
-              disabled={isLoading}
-              required
-            />
-            <p className="form-hint">Matrix 服务器的 URL 地址</p>
+            <label htmlFor="homeserverUrl">Matrix 服务器</label>
+            <input id="homeserverUrl" name="homeserverUrl" type="url" value={formData.homeserverUrl} onChange={handleChange} placeholder="http://localhost:8008" disabled={isLoading} required />
+            <p className="form-hint">输入您的 Matrix 服务器地址</p>
           </div>
 
           <div className="form-group">
             <label htmlFor="username">用户名</label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="yourname"
-              disabled={isLoading}
-              autoComplete="username"
-              required
-            />
+            <input id="username" name="username" type="text" value={formData.username} onChange={handleChange} placeholder="username" disabled={isLoading} autoComplete="username" required />
+            <p className="form-hint">输入您的 Matrix 用户名（不需要 @ 符号）</p>
           </div>
 
           <div className="form-group">
@@ -110,20 +132,16 @@ export const LoginDialog: React.FC<LoginDialogProps> = ({
             <div className="password-input">
               <input
                 id="password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="请输入密码"
                 disabled={isLoading}
                 autoComplete="current-password"
                 required
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
-              >
+              <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1} aria-label={showPassword ? '隐藏密码' : '显示密码'}>
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
@@ -131,26 +149,17 @@ export const LoginDialog: React.FC<LoginDialogProps> = ({
 
           <div className="form-group checkbox-group">
             <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={e => setRememberMe(e.target.checked)}
-                disabled={isLoading}
-              />
+              <input name="rememberMe" type="checkbox" checked={formData.rememberMe} onChange={handleChange} disabled={isLoading} />
               <span>记住我</span>
             </label>
-            <p className="form-hint">下次自动登录（凭证安全存储）</p>
+            <p className="form-hint">下次自动登录，凭证将安全存储</p>
           </div>
 
           <div className="form-actions">
-            <button
-              type="submit"
-              className="btn btn-primary btn-block"
-              disabled={isLoading}
-            >
+            <button type="submit" className="btn btn-primary btn-block" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <span className="spinner-small"></span>
+                  <span className="spinner-small" />
                   登录中...
                 </>
               ) : (
@@ -164,19 +173,12 @@ export const LoginDialog: React.FC<LoginDialogProps> = ({
           {onSwitchToRegister && (
             <p>
               还没有账户？{' '}
-              <button
-                type="button"
-                className="btn-link"
-                onClick={onSwitchToRegister}
-              >
-                注册
+              <button type="button" className="btn-link" onClick={onSwitchToRegister}>
+                立即注册
               </button>
             </p>
           )}
-          <p className="hint">
-            需要帮助？查看{' '}
-            <a href="#" className="link">使用文档</a>
-          </p>
+          <p className="hint">💡 提示：默认服务器地址为 http://localhost:8008</p>
         </div>
       </div>
     </div>

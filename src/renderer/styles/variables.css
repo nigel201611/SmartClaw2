@@ -1,0 +1,60 @@
+/* src/renderer/styles/variables.css */
+:root {
+  /* 颜色系统 */
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --primary-light: #818cf8;
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+
+  /* 背景色 */
+  --bg-dark: #0f172a;
+  --bg-darker: #020617;
+  --bg-sidebar: rgba(15, 23, 42, 0.95);
+  --bg-main: rgba(30, 41, 59, 0.9);
+  --bg-card: rgba(30, 41, 59, 0.8);
+  --bg-card-hover: rgba(30, 41, 59, 0.95);
+  --bg-hover: rgba(51, 65, 85, 0.6);
+  --bg-active: rgba(99, 102, 241, 0.2);
+
+  /* 文本颜色 */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* 边框颜色 */
+  --border: rgba(71, 85, 105, 0.5);
+  --border-light: rgba(71, 85, 105, 0.3);
+  --border-focus: rgba(99, 102, 241, 0.6);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+  /* 圆角 */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+
+  /* 过渡动画 */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 布局尺寸 */
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 70px;
+}
+
+/* 暗色主题优化 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-card: rgba(30, 41, 59, 0.95);
+  }
+}

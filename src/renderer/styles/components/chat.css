@@ -1,0 +1,141 @@
+/* 主容器 */
+.chat-window {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
+  position: relative;
+}
+
+.chat-window::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* 房间列表侧边栏 */
+.room-list {
+  width: var(--sidebar-width);
+  background: var(--bg-sidebar);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width var(--transition-base);
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+
+.room-list.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* 移动端遮罩层 */
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 15;
+  display: none;
+}
+
+/* 主聊天区域 */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 5;
+}
+
+/* 空状态 */
+.chat-main.empty-state {
+  justify-content: center;
+  align-items: center;
+}
+
+.empty-content {
+  text-align: center;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-content h2 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-content p {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-content .error-text {
+  color: var(--error);
+  font-size: 0.875rem;
+}
+
+/* 空消息状态 */
+.empty-messages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  min-height: 200px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 280px;
+    --sidebar-collapsed-width: 0;
+  }
+
+  .mobile-overlay {
+    display: block;
+  }
+
+  .room-list {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 20;
+    transform: translateX(-100%);
+    transition: transform var(--transition-base);
+  }
+
+  .room-list:not(.collapsed) {
+    transform: translateX(0);
+  }
+
+  .room-list.collapsed {
+    transform: translateX(-100%);
+  }
+
+  .message-content {
+    max-width: 85%;
+  }
+}

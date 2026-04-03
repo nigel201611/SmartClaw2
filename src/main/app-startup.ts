@@ -415,7 +415,6 @@ export class AppStartupManager {
       return;
     }
 
-    console.log('preload', path.join(__dirname, 'preload.js'));
     this.startupWindow = new BrowserWindow({
       width: 500,
       height: 450,

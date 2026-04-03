@@ -1,0 +1,8 @@
+@import './variables.css';
+@import './reset.css';
+@import './animations.css';
+
+@import './components/common.css';
+
+@import './components/auth.css';
+@import './components/chat.css';

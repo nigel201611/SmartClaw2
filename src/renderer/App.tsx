@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { ChatWindow } from './components/chat/ChatWindow';
 import { DockerDetection } from './components/DockerDetection';
+import './styles/index.css';
 
 interface AppState {
   authenticated: boolean;
@@ -23,9 +24,9 @@ export function App() {
     });
   }, []);
 
-  if (!state.dockerReady) {
-    return <DockerDetection />;
-  }
+  // if (!state.dockerReady) {
+  //   return <DockerDetection />;
+  // }
   if (!state.authenticated) {
     return <AuthScreen onAuthenticated={() => setState((prev) => ({ ...prev, authenticated: true }))} />;
   }

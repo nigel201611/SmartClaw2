@@ -1,9 +1,4 @@
-/**
- * SmartClaw Authentication Manager
- * 
- * 用户认证管理：登录/注册/会话恢复/凭证存储
- */
-
+// auth-manager.ts
 import * as keytar from 'keytar';
 import { getMatrixClient, MatrixClientWrapper, MatrixSession } from './matrix-client';
 import * as crypto from 'crypto';
@@ -21,11 +16,7 @@ export interface Credentials {
 /**
  * 认证状态
  */
-export type AuthStatus = 
-  | 'unauthenticated'  // 未认证
-  | 'authenticating'   // 认证中
-  | 'authenticated'    // 已认证
-  | 'error';           // 错误
+export type AuthStatus = 'unauthenticated' | 'authenticating' | 'authenticated' | 'error';
 
 /**
  * 认证结果
@@ -34,6 +25,10 @@ export interface AuthResult {
   success: boolean;
   session?: MatrixSession;
   error?: string;
+  // 注册返回的字段
+  userId?: string;
+  deviceId?: string;
+  accessToken?: string;
 }
 
 /**
@@ -60,13 +55,9 @@ export class AuthManager {
     try {
       this.status = 'authenticating';
 
-      // 连接服务器
       await this.matrixClient.connect(homeserverUrl);
-
-      // 执行登录
       const session = await this.matrixClient.login(username, password);
 
-      // 保存会话
       this.currentSession = session;
       this.status = 'authenticated';
 
@@ -75,10 +66,10 @@ export class AuthManager {
     } catch (error: any) {
       this.status = 'error';
       console.error('Login failed:', error);
-      
+
       return {
         success: false,
-        error: this.getAuthErrorMessage(error)
+        error: this.getAuthErrorMessage(error),
       };
     }
   }
@@ -86,35 +77,66 @@ export class AuthManager {
   /**
    * 注册（如果服务器支持）
    */
-  async register(
-    username: string,
-    password: string,
-    homeserverUrl: string
-  ): Promise<AuthResult> {
+  async register(username: string, password: string, homeserver: string, token?: string): Promise<AuthResult> {
+    console.log('[Main] auth:register called', { homeserver, username, hasToken: !!token });
+
     try {
-      this.status = 'authenticating';
+      const registrationBody: any = {
+        username: username,
+        password: password,
+      };
 
-      // 连接服务器
-      await this.matrixClient.connect(homeserverUrl);
-
-      // 检查服务器是否支持注册
-      const client = this.matrixClient.getClient();
-      if (!client) {
-        throw new Error('Matrix 客户端未初始化');
+      if (token) {
+        registrationBody.auth = {
+          type: 'm.login.registration_token',
+          token: token,
+        };
+      } else {
+        registrationBody.auth = {
+          type: 'm.login.dummy',
+        };
       }
 
-      // 获取注册流程（简化处理，实际需要根据服务器响应）
-      // Conduit 默认不支持注册，需要手动创建用户
-      throw new Error(
-        '当前服务器不支持在线注册。\n请使用管理员工具创建用户后登录。'
-      );
+      const response = await fetch(`${homeserver}/_matrix/client/v3/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registrationBody),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('[Main] Registration successful:', data.user_id);
+
+        // 创建会话对象
+        const session: MatrixSession = {
+          userId: data.user_id,
+          deviceId: data.device_id || 'unknown',
+          accessToken: data.access_token,
+          homeserverUrl: homeserver,
+        };
+
+        return {
+          success: true,
+          session: session,
+          userId: data.user_id,
+          deviceId: data.device_id,
+          accessToken: data.access_token,
+        };
+      } else {
+        console.error('[Main] Registration failed:', data);
+        return {
+          success: false,
+          error: data.error || '注册失败',
+        };
+      }
     } catch (error: any) {
-      this.status = 'error';
-      console.error('Registration failed:', error);
-      
+      console.error('[Main] Registration error:', error);
       return {
         success: false,
-        error: error.message || '注册失败'
+        error: error.message,
       };
     }
   }
@@ -124,20 +146,13 @@ export class AuthManager {
    */
   async logout(): Promise<void> {
     try {
-      // 登出 Matrix
       await this.matrixClient.logout();
-
-      // 清除本地凭证
       await this.clearCredentials();
-
-      // 重置状态
       this.currentSession = null;
       this.status = 'unauthenticated';
-
       console.log('Logout successful');
     } catch (error: any) {
       console.error('Logout failed:', error);
-      // 即使出错也清除本地状态
       this.currentSession = null;
       this.status = 'unauthenticated';
     }
@@ -148,9 +163,8 @@ export class AuthManager {
    */
   async restoreSession(): Promise<MatrixSession | null> {
     try {
-      // 尝试从 Keychain 获取凭证
       const credentials = await this.getCredentials();
-      
+
       if (!credentials) {
         console.log('No saved credentials found');
         return null;
@@ -163,19 +177,13 @@ export class AuthManager {
 
       this.status = 'authenticating';
 
-      // 使用保存的凭证登录
-      const result = await this.login(
-        credentials.username,
-        credentials.password,
-        credentials.homeserverUrl
-      );
+      const result = await this.login(credentials.username, credentials.password, credentials.homeserverUrl);
 
       if (result.success && result.session) {
         console.log('Session restored successfully');
         return result.session;
       } else {
         console.log('Session restore failed:', result.error);
-        // 清除无效凭证
         await this.clearCredentials();
         return null;
       }
@@ -191,26 +199,20 @@ export class AuthManager {
   async saveCredentials(credentials: Credentials): Promise<void> {
     try {
       if (!credentials.rememberMe) {
-        // 不记住密码，只保存用户名和服务器
         const data = JSON.stringify({
           username: credentials.username,
           homeserverUrl: credentials.homeserverUrl,
-          rememberMe: false
+          rememberMe: false,
         });
         await keytar.setPassword(KEYCHAIN_SERVICE, 'config', data);
       } else {
-        // 记住密码，保存完整凭证
         const data = JSON.stringify({
           username: credentials.username,
           homeserverUrl: credentials.homeserverUrl,
-          rememberMe: true
+          rememberMe: true,
         });
         await keytar.setPassword(KEYCHAIN_SERVICE, 'config', data);
-        await keytar.setPassword(
-          KEYCHAIN_SERVICE,
-          credentials.username,
-          credentials.password
-        );
+        await keytar.setPassword(KEYCHAIN_SERVICE, credentials.username, credentials.password);
       }
 
       console.log('Credentials saved');
@@ -226,13 +228,13 @@ export class AuthManager {
   async getCredentials(): Promise<Credentials | null> {
     try {
       const configData = await keytar.getPassword(KEYCHAIN_SERVICE, 'config');
-      
+
       if (!configData) {
         return null;
       }
 
       const config = JSON.parse(configData);
-      
+
       let password = '';
       if (config.rememberMe) {
         const retrievedPassword = await keytar.getPassword(KEYCHAIN_SERVICE, config.username);
@@ -243,7 +245,7 @@ export class AuthManager {
         username: config.username,
         password: password,
         homeserverUrl: config.homeserverUrl,
-        rememberMe: config.rememberMe
+        rememberMe: config.rememberMe,
       };
     } catch (error: any) {
       console.error('Failed to get credentials:', error);
@@ -257,7 +259,7 @@ export class AuthManager {
   async clearCredentials(): Promise<void> {
     try {
       const configData = await keytar.getPassword(KEYCHAIN_SERVICE, 'config');
-      
+
       if (configData) {
         const config = JSON.parse(configData);
         if (config.username) {

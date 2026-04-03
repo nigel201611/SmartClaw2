@@ -1,115 +1,112 @@
-/**
- * SmartClaw Room List Component
- * 
- * 房间列表侧边栏
- */
+// RoomList.tsx
+import React, { useState } from 'react';
 
-import React from 'react';
-import { RoomInfo } from '../../hooks/useMatrix';
-import { RoomItem } from './RoomItem';
-
-interface RoomListProps {
-  rooms: RoomInfo[];
-  selectedRoomId: string | null;
-  onRoomSelect: (roomId: string) => void;
-  onLogout?: () => void;
-  onCollapseToggle?: (collapsed: boolean) => void;
-  isCollapsed?: boolean;
+// 定义组件内部使用的房间类型
+export interface DisplayRoom {
+  roomId: string;
+  name: string;
+  topic?: string;
+  memberCount: number;
+  isDirect: boolean;
+  lastMessage?: string;
+  lastMessageTime?: Date;
+  unreadCount: number;
 }
 
-/**
- * 房间列表组件
- */
-export const RoomList: React.FC<RoomListProps> = ({
-  rooms,
-  selectedRoomId,
-  onRoomSelect,
-  onLogout,
-  onCollapseToggle,
-  isCollapsed = false
-}) => {
-  // 按最后消息时间排序
-  const sortedRooms = [...rooms].sort((a, b) => {
-    const aTime = a.lastMessage?.timestamp || 0;
-    const bTime = b.lastMessage?.timestamp || 0;
-    return bTime - aTime;
-  });
+interface RoomListProps {
+  rooms: DisplayRoom[];
+  selectedRoomId: string | null;
+  onRoomSelect: (roomId: string) => void;
+  onLogout: () => void;
+  onCollapseToggle: (collapsed: boolean) => void;
+  isCollapsed: boolean;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
 
-  // 计算未读消息数（示例）
-  const getUnreadCount = (room: RoomInfo): number => {
-    // TODO: 实现未读消息计数逻辑
-    return 0;
+export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoomSelect, onLogout, onCollapseToggle, isCollapsed, isMobileOpen, onMobileClose }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredRooms = rooms.filter((room) => room.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const formatTime = (date?: Date) => {
+    if (!date) return '';
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const hours = diff / (1000 * 60 * 60);
+
+    if (hours < 24) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (hours < 48) {
+      return '昨天';
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
   };
 
-  const handleCollapseToggle = () => {
-    if (onCollapseToggle) {
-      onCollapseToggle(!isCollapsed);
+  // 关闭移动端侧边栏（点击内容区域时）
+  const handleContentClick = () => {
+    if (isMobileOpen && onMobileClose) {
+      onMobileClose();
     }
   };
 
   return (
-    <div className={`room-list ${isCollapsed ? 'collapsed' : ''}`}>
-      <div className="room-list-header">
-        <h2>SmartClaw</h2>
-        <button 
-          className="collapse-btn"
-          onClick={handleCollapseToggle}
-          title={isCollapsed ? '展开' : '收起'}
-        >
-          {isCollapsed ? '→' : '←'}
-        </button>
-      </div>
-      
-      {!isCollapsed && (
-        <>
-          <div className="room-list-actions">
-            <button className="btn-new-room" title="新建房间">
-              + 新建
-            </button>
+    <>
+      {/* 移动端遮罩层 */}
+      {isMobileOpen && <div className="mobile-overlay" onClick={onMobileClose} />}
+
+      <div className={`room-list ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
+        <div className="room-list-header">
+          <div className="logo-area">
+            <div className="logo-icon">🦞</div>
+            <div className="logo-text">SmartClaw</div>
           </div>
-          
-          <div className="room-list-search">
-            <input
-              type="text"
-              placeholder="搜索房间..."
-              className="search-input"
-            />
-          </div>
-          
-          <div className="room-list-content">
-            {sortedRooms.length === 0 ? (
-              <div className="empty-rooms">
-                <p>暂无房间</p>
-                <button className="btn-create">创建第一个房间</button>
+          <button className="toggle-btn" onClick={() => onCollapseToggle(!isCollapsed)} title={isCollapsed ? '展开侧边栏' : '收起侧边栏'}>
+            {isCollapsed ? '☰' : '◀'}
+          </button>
+        </div>
+
+        {!isCollapsed && (
+          <>
+            <div className="room-search">
+              <div className="search-input-wrapper">
+                <span className="search-icon">🔍</span>
+                <input type="text" className="search-input" placeholder="搜索房间..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
-            ) : (
-              sortedRooms.map(room => (
-                <RoomItem
-                  key={room.roomId}
-                  room={room}
-                  isSelected={room.roomId === selectedRoomId}
-                  unreadCount={getUnreadCount(room)}
-                  onClick={() => onRoomSelect(room.roomId)}
-                />
-              ))
-            )}
-          </div>
-          
-          <div className="room-list-footer">
-            <div className="user-info">
-              <div className="avatar">👤</div>
-              <span className="username">用户</span>
             </div>
-            {onLogout && (
-              <button className="btn-logout" onClick={onLogout}>
-                登出
+
+            <div className="rooms-container" onClick={handleContentClick}>
+              {filteredRooms.map((room) => (
+                <div key={room.roomId} className={`room-item ${selectedRoomId === room.roomId ? 'active' : ''}`} onClick={() => onRoomSelect(room.roomId)}>
+                  <div className="room-avatar">
+                    {room.name.charAt(0).toUpperCase()}
+                    {room.unreadCount > 0 && <span className="unread-badge">{room.unreadCount > 99 ? '99+' : room.unreadCount}</span>}
+                  </div>
+                  <div className="room-info">
+                    <div className="room-name">{room.name}</div>
+                    {room.lastMessage && <div className="room-last-message">{room.lastMessage}</div>}
+                  </div>
+                  {room.lastMessageTime && <div className="room-time">{formatTime(room.lastMessageTime)}</div>}
+                </div>
+              ))}
+
+              {filteredRooms.length === 0 && (
+                <div className="text-muted" style={{ textAlign: 'center', padding: '2rem' }}>
+                  {searchQuery ? '未找到匹配的房间' : '暂无房间'}
+                </div>
+              )}
+            </div>
+
+            <div className="room-list-footer">
+              <button className="logout-btn" onClick={onLogout}>
+                <span>🚪</span>
+                <span>退出登录</span>
               </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 };
-
-export default RoomList;

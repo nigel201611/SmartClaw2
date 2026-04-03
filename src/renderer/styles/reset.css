@@ -1,0 +1,58 @@
+/* src/renderer/styles/reset.css */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 移除默认按钮样式 */
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* 移除默认链接样式 */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* 移除默认列表样式 */
+ul,
+ol {
+  list-style: none;
+}
+
+/* 移除默认输入框样式 */
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* 无动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

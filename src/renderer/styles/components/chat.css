@@ -32,9 +32,9 @@
   gap: 12px;
 }
 
-.logo-icon {
+/* .logo-icon {
   font-size: 28px;
-}
+} */
 
 .logo-text {
   font-size: 20px;
@@ -43,7 +43,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  letter-spacing: -0.5px;
+  /* letter-spacing: -0.5px; */
 }
 
 /* 搜索框 */
@@ -515,6 +515,7 @@
   padding: 2rem;
 }
 .create-first-room-btn {
+  margin-left: 5px;
   padding: 10px 16px;
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
@@ -532,7 +533,6 @@
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
-/* 在 chat-window.css 中添加或更新退出确认对话框样式 */
 .logout-confirm-overlay {
   position: fixed;
   top: 0;

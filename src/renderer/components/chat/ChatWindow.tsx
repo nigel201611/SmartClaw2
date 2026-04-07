@@ -7,6 +7,7 @@ import { MessageInput } from './MessageInput';
 import { RoomHeader } from './RoomHeader';
 import { TypingIndicator } from './TypingIndicator';
 import { CreateRoomDialog } from './CreateRoomDialog';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface ChatWindowProps {
   onLogout?: () => void;
@@ -160,22 +161,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ onLogout }) => {
         </div>
 
         {/* 确认退出对话框 */}
-        {showLogoutConfirm && (
-          <div className="logout-confirm-overlay">
-            <div className="logout-confirm-dialog">
-              <h3>确认退出</h3>
-              <p>确定要退出登录吗？</p>
-              <div className="confirm-buttons">
-                <button className="confirm-cancel" onClick={handleCancelLogout}>
-                  取消
-                </button>
-                <button className="confirm-ok" onClick={handleConfirmLogout}>
-                  确定
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          isOpen={showLogoutConfirm}
+          title="确认退出"
+          message="确定要退出登录吗？"
+          confirmText="确定"
+          cancelText="取消"
+          onConfirm={handleConfirmLogout}
+          onCancel={handleCancelLogout}
+          isLoading={isLoggingOut}
+          confirmVariant="danger"
+        />
 
         {/* 创建房间对话框 */}
         <CreateRoomDialog isOpen={isCreateDialogOpen} onClose={handleCloseCreateDialog} onCreateRoom={handleCreateRoom} isLoading={isCreatingRoom} />
@@ -200,22 +196,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ onLogout }) => {
       </div>
 
       {/* 确认退出对话框 */}
-      {showLogoutConfirm && (
-        <div className="logout-confirm-overlay">
-          <div className="logout-confirm-dialog">
-            <h3>确认退出</h3>
-            <p>确定要退出登录吗？</p>
-            <div className="confirm-buttons">
-              <button className="confirm-cancel" onClick={handleCancelLogout}>
-                取消
-              </button>
-              <button className="confirm-ok" onClick={handleConfirmLogout}>
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        title="确认退出"
+        message="确定要退出登录吗？"
+        confirmText="确定"
+        cancelText="取消"
+        onConfirm={handleConfirmLogout}
+        onCancel={handleCancelLogout}
+        isLoading={isLoggingOut}
+        confirmVariant="danger"
+      />
 
       {/* 创建房间对话框 */}
       <CreateRoomDialog isOpen={isCreateDialogOpen} onClose={handleCloseCreateDialog} onCreateRoom={handleCreateRoom} isLoading={isCreatingRoom} />

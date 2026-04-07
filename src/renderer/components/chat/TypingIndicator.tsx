@@ -1,29 +1,27 @@
-// TypingIndicator.tsx - 打字指示器组件
+// TypingIndicator.tsx
 import React, { useEffect, useState } from 'react';
 
 interface TypingIndicatorProps {
   roomId: string | null;
+  typingUsers?: string[];
 }
 
-// 模拟打字状态（实际应从 Matrix SDK 获取）
-export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ roomId }) => {
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ roomId, typingUsers = [] }) => {
+  const [displayText, setDisplayText] = useState('');
 
   useEffect(() => {
-    if (!roomId) return;
+    if (typingUsers.length === 0) {
+      setDisplayText('');
+    } else if (typingUsers.length === 1) {
+      setDisplayText(`${typingUsers[0]} 正在输入...`);
+    } else if (typingUsers.length === 2) {
+      setDisplayText(`${typingUsers[0]} 和 ${typingUsers[1]} 正在输入...`);
+    } else {
+      setDisplayText(`${typingUsers.length} 个人正在输入...`);
+    }
+  }, [typingUsers]);
 
-    // 这里应该监听 Matrix 的 typing 事件
-    // 现在是模拟数据
-    const interval = setInterval(() => {
-      // 随机模拟有人正在输入
-      const hasTyping = Math.random() > 0.7;
-      setTypingUsers(hasTyping ? ['someone'] : []);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [roomId]);
-
-  if (typingUsers.length === 0) return null;
+  if (!displayText) return null;
 
   return (
     <div className="typing-indicator">
@@ -32,7 +30,7 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ roomId }) => {
         <span></span>
         <span></span>
       </div>
-      <span>有人正在输入...</span>
+      <span>{displayText}</span>
     </div>
   );
 };

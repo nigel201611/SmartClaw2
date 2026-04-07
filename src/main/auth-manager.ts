@@ -1,7 +1,6 @@
 // auth-manager.ts
 import * as keytar from 'keytar';
 import { getMatrixClient, MatrixClientWrapper, MatrixSession } from './matrix-client';
-import * as crypto from 'crypto';
 
 /**
  * 认证凭据
@@ -51,7 +50,7 @@ export class AuthManager {
   /**
    * 登录
    */
-  async login(username: string, password: string, homeserverUrl: string): Promise<AuthResult> {
+  async login(homeserverUrl: string, username: string, password: string): Promise<AuthResult> {
     try {
       this.status = 'authenticating';
 
@@ -77,7 +76,7 @@ export class AuthManager {
   /**
    * 注册（如果服务器支持）
    */
-  async register(username: string, password: string, homeserver: string, token?: string): Promise<AuthResult> {
+  async register(homeserver: string, username: string, password: string, token?: string): Promise<AuthResult> {
     console.log('[Main] auth:register called', { homeserver, username, hasToken: !!token });
 
     try {
@@ -293,6 +292,27 @@ export class AuthManager {
    */
   getSession(): MatrixSession | null {
     return this.currentSession ? { ...this.currentSession } : null;
+  }
+
+  /**
+   * 获取当前用户 ID
+   */
+  getCurrentUserId(): string | null {
+    return this.currentSession?.userId || null;
+  }
+
+  /**
+   * 获取当前 homeserver URL
+   */
+  getCurrentHomeserver(): string | null {
+    return this.currentSession?.homeserverUrl || null;
+  }
+
+  /**
+   * 获取访问令牌
+   */
+  getAccessToken(): string | null {
+    return this.currentSession?.accessToken || null;
   }
 
   /**

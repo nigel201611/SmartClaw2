@@ -5,17 +5,21 @@
  */
 
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import * as path from 'path';
 import { getAppStartupManager, AppStartupManager } from './app-startup';
 import { registerDockerIPCHandlers, cleanupDockerIPC } from './docker-ipc';
+import { registerAuthIPCHandlers, cleanupAuthIPC } from './auth-ipc';
+import { registerMatrixIPCHandlers, cleanupMatrixIPC } from './matrix-ipc';
+import { registerSettingsIPCHandlers } from './settings-ipc';
+import { registerMessageIPCHandlers, cleanupMessageIPC } from './message-ipc';
 
 // 禁用 GPU 加速（可选，节省资源）
 app.disableHardwareAcceleration();
-
 // 应用启动管理器
 let startupManager: AppStartupManager;
 // 主窗口引用
 let mainWindow: BrowserWindow | null = null;
+// 标记是否正在关闭
+let isQuitting = false;
 
 /**
  * 应用启动主流程
@@ -27,7 +31,18 @@ async function onAppReady() {
     mainWindow = startupManager.getMainWindow();
     // 注册 IPC 处理器
     if (mainWindow) {
+      registerAuthIPCHandlers(mainWindow);
       registerDockerIPCHandlers(mainWindow);
+      registerMatrixIPCHandlers(mainWindow);
+      registerSettingsIPCHandlers(mainWindow);
+      registerMessageIPCHandlers(mainWindow);
+      mainWindow.on('close', async (event) => {
+        if (isQuitting) {
+          return;
+        }
+        event.preventDefault();
+        await handleAppClose();
+      });
     }
   } else {
     console.error('SmartClaw startup failed:', result.error);
@@ -35,10 +50,43 @@ async function onAppReady() {
   }
 }
 
+async function handleAppClose(): Promise<void> {
+  if (isQuitting) return;
+  isQuitting = true;
+  const forceExitTimeout = setTimeout(() => {
+    console.warn('Force quitting after timeout');
+    app.exit(0);
+  }, 3000);
+
+  try {
+    // 显示关闭提示（可选）
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app:closing');
+    }
+    await performCleanup();
+    console.log('Cleanup completed, exiting...');
+    clearTimeout(forceExitTimeout);
+    app.exit(0);
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    clearTimeout(forceExitTimeout);
+    app.exit(1);
+  }
+}
+
+async function performCleanup(): Promise<void> {
+  cleanupDockerIPC();
+  cleanupAuthIPC();
+  cleanupMatrixIPC();
+  cleanupMessageIPC();
+  if (startupManager) {
+    await startupManager.onAppClosing();
+  }
+}
 // macOS: 所有窗口关闭时
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
+  if (process.platform !== 'darwin' && !isQuitting) {
+    handleAppClose();
   }
 });
 
@@ -52,21 +100,12 @@ app.whenReady().then(async () => {
   }
 });
 
-// 应用即将退出
+// 应用即将退出 - 修复版
 app.on('will-quit', async (event) => {
-  event.preventDefault();
-  cleanupDockerIPC();
-  // 停止容器（如果配置为退出时停止）
-  try {
-    await startupManager?.onAppClosing();
-  } catch (error) {
-    console.error('Error during shutdown:', error);
+  if (!isQuitting) {
+    event.preventDefault();
+    await handleAppClose();
   }
-
-  // 延迟退出，确保清理完成
-  setTimeout(() => {
-    app.exit(0);
-  }, 500);
 });
 
 // 子进程意外退出
@@ -121,11 +160,25 @@ ipcMain.handle('app:quit', () => {
 process.on('uncaughtException', (error) => {
   console.error('Uncaught exception:', error);
 
-  dialog.showErrorBox('未处理的异常', `发生错误：${error.message}\n\n应用可能不稳定。`);
+  // 避免在退出过程中显示错误框
+  if (!isQuitting) {
+    dialog.showErrorBox('未处理的异常', `发生错误：${error.message}\n\n应用可能不稳定。`);
+  }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled rejection at:', promise, 'reason:', reason);
+});
+
+// 处理 SIGINT (Ctrl+C) 和 SIGTERM 信号
+process.on('SIGINT', () => {
+  console.log('Received SIGINT (Ctrl+C), quitting application...');
+  handleAppClose();
+});
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, quitting application...');
+  handleAppClose();
 });
 
 // if (process.env.NODE_ENV === 'development') {

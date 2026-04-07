@@ -38,7 +38,7 @@ export interface IElectronAPI {
   // Auth methods
   checkAuth: () => Promise<any>;
   login: (homeserver: string, username: string, password: string) => Promise<any>;
-  register: (homeserver: string, username: string, password: string, email?: string) => Promise<any>;
+  register: (homeserver: string, username: string, password: string, token: string, email?: string) => Promise<any>;
   logout: () => Promise<void>;
   getAuthStatus: () => Promise<any>;
   getCurrentUser: () => Promise<any>;
@@ -48,7 +48,7 @@ export interface IElectronAPI {
   clearCredentials: () => Promise<void>;
 
   // Matrix methods
-  connect: () => Promise<void>;
+  connect: (homeserverUrl: string) => Promise<void>;
   disconnect: () => Promise<void>;
   getSyncState: () => Promise<string>;
   getRooms: () => Promise<any[]>;
@@ -80,6 +80,7 @@ export interface IElectronAPI {
   onMatrixSync: (callback: (state: string) => void) => () => void;
   onRoomUpdate: (callback: (rooms: any[]) => void) => () => void;
   onMessageReceived: (callback: (message: any) => void) => () => void;
+  createRoom: (name: string, topic?: string) => Promise<any>;
 }
 
 const electronAPI: IElectronAPI = {
@@ -172,7 +173,7 @@ const electronAPI: IElectronAPI = {
   // Auth methods
   checkAuth: () => ipcRenderer.invoke('auth:check'),
   login: (homeserver: string, username: string, password: string) => ipcRenderer.invoke('auth:login', homeserver, username, password),
-  register: (homeserver: string, username: string, password: string, email?: string) => ipcRenderer.invoke('auth:register', homeserver, username, password, email),
+  register: (homeserver: string, username: string, password: string, token: string, email?: string) => ipcRenderer.invoke('auth:register', homeserver, username, password, token, email),
   logout: () => ipcRenderer.invoke('auth:logout'),
   getAuthStatus: () => ipcRenderer.invoke('auth:get-status'),
   getCurrentUser: () => ipcRenderer.invoke('auth:get-current-user'),
@@ -182,7 +183,7 @@ const electronAPI: IElectronAPI = {
   clearCredentials: () => ipcRenderer.invoke('auth:clear-credentials'),
 
   // Matrix methods
-  connect: () => ipcRenderer.invoke('matrix:connect'),
+  connect: (homeserverUrl: string) => ipcRenderer.invoke('matrix:connect', homeserverUrl),
   disconnect: () => ipcRenderer.invoke('matrix:disconnect'),
   getSyncState: () => ipcRenderer.invoke('matrix:get-sync-state'),
   getRooms: () => ipcRenderer.invoke('matrix:get-rooms'),
@@ -229,6 +230,11 @@ const electronAPI: IElectronAPI = {
     const listener = (_event: IpcRendererEvent, message: any) => callback(message);
     ipcRenderer.on('matrix:message', listener);
     return () => ipcRenderer.removeListener('matrix:message', listener);
+  },
+  createRoom: async (name: string, topic?: string) => {
+    const result = await ipcRenderer.invoke('matrix:create-room', name, topic);
+    console.log('IPC: createRoom result:', result);
+    return result;
   },
 };
 

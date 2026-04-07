@@ -6,3 +6,5 @@
 
 @import './components/auth.css';
 @import './components/chat.css';
+
+@import './components/createRoomDialog.css';

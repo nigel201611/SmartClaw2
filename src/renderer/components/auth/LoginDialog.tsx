@@ -35,8 +35,8 @@ export const LoginDialog: React.FC<LoginDialogProps> = ({
   useEffect(() => {
     const loadSavedCredentials = async () => {
       try {
-        const savedHomeserver = await window.electronAPI.getHomeserver();
-        const savedUserId = await window.electronAPI.getCurrentUser();
+        const { success, data: savedHomeserver } = await window.electronAPI.getHomeserver();
+        const { data: savedUserId } = await window.electronAPI.getCurrentUser();
 
         if (savedHomeserver) {
           setFormData((prev) => ({ ...prev, homeserverUrl: savedHomeserver }));
@@ -117,7 +117,7 @@ export const LoginDialog: React.FC<LoginDialogProps> = ({
 
           <div className="form-group">
             <label htmlFor="homeserverUrl">Matrix 服务器</label>
-            <input id="homeserverUrl" name="homeserverUrl" type="url" value={formData.homeserverUrl} onChange={handleChange} placeholder="http://localhost:8008" disabled={isLoading} required />
+            <input disabled id="homeserverUrl" name="homeserverUrl" type="url" value={formData.homeserverUrl} onChange={handleChange} placeholder="http://localhost:8008" required />
             <p className="form-hint">输入您的 Matrix 服务器地址</p>
           </div>
 

@@ -48,6 +48,7 @@ export class AppStartupManager {
   private mainWindow: BrowserWindow | null = null;
   private startupWindow: BrowserWindow | null = null;
   private currentState: StartupState = StartupState.INITIALIZING;
+  private isClosing = false; // 添加关闭标志
 
   constructor() {
     this.dockerDetector = new DockerDetector();
@@ -277,7 +278,7 @@ export class AppStartupManager {
       }
       await this.retryStartup();
     } else {
-      app.quit();
+      this.requestAppExit();
     }
   }
 
@@ -300,7 +301,7 @@ export class AppStartupManager {
     } else if (result.response === 1) {
       await this.showLogs();
     } else {
-      app.quit();
+      this.requestAppExit();
     }
   }
 
@@ -346,8 +347,19 @@ export class AppStartupManager {
     if (result.response === 0) {
       await this.retryStartup();
     } else {
-      app.quit();
+      this.requestAppExit();
     }
+  }
+
+  /**
+   * 请求应用退出（通知 main.ts）
+   */
+  private requestAppExit(): void {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send('app:request-exit');
+    }
+    // 如果没有主窗口，直接发送全局事件
+    process.emit('SIGINT' as any);
   }
 
   /**
@@ -537,11 +549,6 @@ export class AppStartupManager {
 
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
-    });
-
-    this.mainWindow.on('close', async (event) => {
-      event.preventDefault();
-      await this.onAppClosing();
     });
 
     if (process.env.NODE_ENV === 'development') {
@@ -783,39 +790,13 @@ export class AppStartupManager {
    * 应用关闭处理
    */
   async onAppClosing(): Promise<void> {
-    const shouldStop = await this.shouldStopContainersOnExit();
-
-    if (shouldStop && this.mainWindow) {
-      // 显示关闭提示
-      const splash = new BrowserWindow({
-        width: 300,
-        height: 150,
-        frame: false,
-        transparent: true,
-        alwaysOnTop: true,
-        webPreferences: { nodeIntegration: false },
-      });
-
-      splash.loadURL(`data:text/html;charset=utf-8,
-        <html><body style="background: rgba(0,0,0,0.7); color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif;">
-          <div style="text-align: center;">🦞 正在清理资源...<br/><span style="font-size: 12px;">请稍候</span></div>
-        </body></html>
-      `);
-      splash.center();
-
-      await this.dockerManager.stopContainer();
-      splash.close();
-    }
-
-    this.cleanup();
-    app.quit();
+    if (this.isClosing) return;
+    this.isClosing = true;
+    await this.cleanup();
+    console.log('AppStartupManager: Cleanup completed');
   }
 
-  /**
-   * 询问用户是否在退出时停止容器
-   */
   private async shouldStopContainersOnExit(): Promise<boolean> {
-    // 从用户设置中读取，默认停止容器
     try {
       const settingsPath = path.join(app.getPath('userData'), 'settings.json');
       if (fs.existsSync(settingsPath)) {
@@ -831,9 +812,24 @@ export class AppStartupManager {
   /**
    * 清理资源
    */
-  private cleanup(): void {
+  private async cleanup(): Promise<void> {
+    // const shouldStop = await this.shouldStopContainersOnExit();
+    // if (shouldStop && this.dockerManager) {
+    //   try {
+    //     await this.dockerManager.stopContainer();
+    //   } catch (error) {
+    //     console.error('Error stopping container:', error);
+    //   }
+    // }
+
+    // 登出 Matrix 服务
     if (this.matrixService) {
-      this.matrixService.logout().catch(console.error);
+      try {
+        console.log('Logging out from Matrix...');
+        await this.matrixService.logout().catch(console.error);
+      } catch (error) {
+        console.error('Error logging out:', error);
+      }
       this.matrixService = null;
     }
 
@@ -869,8 +865,23 @@ export class AppStartupManager {
     ];
 
     handlers.forEach((handler) => {
-      ipcMain.removeHandler(handler);
+      try {
+        ipcMain.removeHandler(handler);
+      } catch (error) {
+        // 忽略错误
+      }
     });
+
+    // 关闭窗口
+    if (this.startupWindow && !this.startupWindow.isDestroyed()) {
+      this.startupWindow.destroy();
+      this.startupWindow = null;
+    }
+
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.destroy();
+      this.mainWindow = null;
+    }
   }
 
   /**

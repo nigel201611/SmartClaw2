@@ -1,11 +1,10 @@
-/**
- * SmartClaw Message Item Component
- * 
- * 单个消息气泡
- */
+// src/renderer/components/chat/MessageItem.tsx
+import React from 'react';
+import { Avatar, Typography, Space, Tooltip } from 'antd';
+import { UserOutlined } from '@ant-design/icons';
+import type { MessageContent } from '../../types';
 
-import React, { useState } from 'react';
-import { MessageContent } from '../../hooks/useMatrix';
+const { Text } = Typography;
 
 interface MessageItemProps {
   message: MessageContent;
@@ -13,97 +12,74 @@ interface MessageItemProps {
   showAvatar?: boolean;
 }
 
-/**
- * 消息项组件
- */
-export const MessageItem: React.FC<MessageItemProps> = ({
-  message,
-  isOwn,
-  showAvatar = true
-}) => {
-  const [showTime, setShowTime] = useState(false);
-
-  // 格式化时间
+export const MessageItem: React.FC<MessageItemProps> = ({ message, isOwn, showAvatar = true }) => {
   const formatTime = (timestamp: number): string => {
     return new Date(timestamp).toLocaleTimeString('zh-CN', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
-  // 格式化日期
   const formatDate = (timestamp: number): string => {
     return new Date(timestamp).toLocaleDateString('zh-CN', {
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
-  // 获取发送者名称
   const getSenderName = (): string => {
     return message.sender.split(':')[0].replace('@', '');
   };
 
-  // 渲染消息内容（支持简单 Markdown）
-  const renderContent = (): React.ReactNode => {
-    let content = message.content.body;
-    
-    // 简单的 Markdown 解析
-    // 粗体
-    content = content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    // 斜体
-    content = content.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    // 代码
-    content = content.replace(/`(.+?)`/g, '<code>$1</code>');
-    // 链接
-    content = content.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    
-    return <span dangerouslySetInnerHTML={{ __html: content }} />;
-  };
-
   return (
     <div
-      className={`message-item ${isOwn ? 'own' : 'other'} ${showAvatar ? 'show-avatar' : ''}`}
-      onMouseEnter={() => setShowTime(true)}
-      onMouseLeave={() => setShowTime(false)}
+      style={{
+        display: 'flex',
+        flexDirection: isOwn ? 'row-reverse' : 'row',
+        gap: 12,
+        marginBottom: 16,
+        alignItems: 'flex-start',
+      }}
     >
-      {!isOwn && showAvatar && (
-        <div className="message-avatar">
-          <div className="avatar">
-            {getSenderName().charAt(0).toUpperCase()}
-          </div>
-        </div>
-      )}
-      
-      <div className="message-content">
+      {!isOwn && showAvatar && <Avatar style={{ backgroundColor: '#667eea' }}>{getSenderName().charAt(0).toUpperCase()}</Avatar>}
+
+      <div
+        style={{
+          maxWidth: '70%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: isOwn ? 'flex-end' : 'flex-start',
+          gap: 4,
+        }}
+      >
         {!isOwn && showAvatar && (
-          <div className="message-sender">
+          <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
             {getSenderName()}
-          </div>
+          </Text>
         )}
-        
-        <div className="message-bubble">
-          <div className="message-text">
-            {renderContent()}
-          </div>
-          
-          <div className={`message-meta ${showTime ? 'visible' : ''}`}>
-            <span className="message-time" title={formatDate(message.timestamp)}>
-              {formatTime(message.timestamp)}
-            </span>
-          </div>
+
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: 12,
+            backgroundColor: isOwn ? '#667eea' : '#f5f5f5',
+            color: isOwn ? 'white' : 'inherit',
+            wordBreak: 'break-word',
+          }}
+        >
+          <Text style={{ color: isOwn ? 'white' : 'inherit' }}>{message.content.body}</Text>
         </div>
+
+        <Tooltip title={formatDate(message.timestamp)}>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {formatTime(message.timestamp)}
+          </Text>
+        </Tooltip>
       </div>
-      
-      {isOwn && showAvatar && (
-        <div className="message-avatar">
-          <div className="avatar own">
-            👤
-          </div>
-        </div>
-      )}
+
+      {isOwn && showAvatar && <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#52c41a' }} />}
     </div>
   );
 };

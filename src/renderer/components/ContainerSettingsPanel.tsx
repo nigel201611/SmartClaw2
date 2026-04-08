@@ -1,14 +1,11 @@
-/**
- * SmartClaw Container Settings Panel (React)
- *
- * 容器设置 UI 组件
- */
-
+// src/renderer/components/settings/ContainerSettingsPanel.tsx
 import React, { useState, useEffect } from 'react';
+import { Modal, Form, Switch, Select, InputNumber, Button, Space, Alert, Card, Typography, Divider, Row, Col, message, Spin } from 'antd';
+import { RocketOutlined, CloseOutlined, SaveOutlined, ReloadOutlined, CloudServerOutlined, SettingOutlined, ClockCircleOutlined, ApiOutlined } from '@ant-design/icons';
 
-/**
- * 容器设置接口
- */
+const { Title, Text } = Typography;
+const { Option } = Select;
+
 interface ContainerSettings {
   autoStartOnLaunch: boolean;
   autoStopOnQuit: boolean;
@@ -25,45 +22,37 @@ interface ContainerSettings {
 }
 
 interface SettingsPanelProps {
+  open: boolean;
   onClose?: () => void;
 }
 
-/**
- * 安全获取 Electron API
- */
 const getElectronAPI = (): IElectronAPI => {
   if (!window.electronAPI) {
-    throw new Error('Electron API not available. Please ensure preload script is loaded correctly.');
+    throw new Error('Electron API not available');
   }
   return window.electronAPI;
 };
 
-/**
- * 设置面板组件
- */
-export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
-  const [settings, setSettings] = useState<ContainerSettings | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ open, onClose }) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // 加载设置
   useEffect(() => {
-    loadSettings();
-  }, []);
+    if (open) {
+      loadSettings();
+    }
+  }, [open]);
 
   const loadSettings = async () => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       const api = getElectronAPI();
-
-      // 使用 preload 中的 settings 方法
       const settingsData = await api.getSettings();
       const containerSettings = await api.getContainerSettings();
 
-      // 合并设置
-      const mergedSettings: ContainerSettings = {
+      const mergedSettings = {
         autoStartOnLaunch: containerSettings?.autoStartOnLaunch ?? settingsData?.autoStartOnLaunch ?? true,
         autoStopOnQuit: containerSettings?.autoStopOnQuit ?? settingsData?.autoStopOnQuit ?? true,
         runInBackground: containerSettings?.runInBackground ?? settingsData?.runInBackground ?? false,
@@ -79,247 +68,225 @@ export const ContainerSettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }
           },
       };
 
-      setSettings(mergedSettings);
-    } catch (err: any) {
-      setError(err.message || '加载设置失败');
+      form.setFieldsValue(mergedSettings);
+    } catch (error: any) {
+      message.error(error.message || '加载设置失败');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const saveSettings = async () => {
-    if (!settings) return;
-
+  const handleSave = async () => {
     try {
-      setIsSaving(true);
-      setError(null);
-      setSuccess(false);
-
+      setSaving(true);
+      const values = await form.validateFields();
       const api = getElectronAPI();
-
-      // 使用 preload 中的 settings 方法
-      await api.saveContainerSettings(settings);
-
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message || '保存设置失败');
+      await api.saveContainerSettings(values);
+      message.success('设置已保存');
+      onClose?.();
+    } catch (error: any) {
+      if (error.errorFields) {
+        message.error('请检查表单填写');
+      } else {
+        message.error(error.message || '保存设置失败');
+      }
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const resetToDefaults = async () => {
-    try {
-      const api = getElectronAPI();
+  const handleReset = async () => {
+    const defaultSettings = {
+      autoStartOnLaunch: true,
+      autoStopOnQuit: true,
+      runInBackground: false,
+      memoryLimit: '200MB',
+      cpuLimit: 1,
+      logLevel: 'info',
+      healthCheckTimeout: 60,
+      startupTimeout: 120,
+      portConfig: {
+        matrixPort: 8008,
+        autoSelectPort: true,
+      },
+    };
 
-      const defaultSettings: ContainerSettings = {
-        autoStartOnLaunch: true,
-        autoStopOnQuit: true,
-        runInBackground: false,
-        memoryLimit: '200MB',
-        cpuLimit: 1,
-        logLevel: 'info',
-        healthCheckTimeout: 60,
-        startupTimeout: 120,
-        portConfig: {
-          matrixPort: 8008,
-          autoSelectPort: true,
-        },
-      };
-
-      // 保存默认设置
-      await api.saveContainerSettings(defaultSettings);
-      setSettings(defaultSettings);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message || '重置设置失败');
-    }
+    form.setFieldsValue(defaultSettings);
+    message.info('已恢复默认设置，请点击保存生效');
   };
-
-  const updateSetting = <K extends keyof ContainerSettings>(key: K, value: ContainerSettings[K]) => {
-    if (settings) {
-      setSettings({ ...settings, [key]: value });
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="settings-panel loading">
-        <div className="spinner" />
-        <p>加载设置中...</p>
-      </div>
-    );
-  }
-
-  if (!settings) {
-    return (
-      <div className="settings-panel error">
-        <p>无法加载设置</p>
-        <button onClick={loadSettings}>重试</button>
-      </div>
-    );
-  }
 
   return (
-    <div className="settings-panel">
-      <div className="settings-header">
-        <h2>容器设置</h2>
-        {onClose && (
-          <button className="close-btn" onClick={onClose}>
-            ×
-          </button>
-        )}
-      </div>
-
-      {success && <div className="alert success">设置已保存</div>}
-
-      {error && <div className="alert error">{error}</div>}
-
-      <div className="settings-content">
-        {/* 启动行为 */}
-        <section className="settings-section">
-          <h3>启动行为</h3>
-
-          <div className="setting-item">
-            <label>
-              <input type="checkbox" checked={settings.autoStartOnLaunch} onChange={(e) => updateSetting('autoStartOnLaunch', e.target.checked)} />
-              <span>应用启动时自动启动容器</span>
-            </label>
-            <p className="help-text">启动应用时自动启动 Matrix 容器</p>
-          </div>
-
-          <div className="setting-item">
-            <label>
-              <input type="checkbox" checked={settings.autoStopOnQuit} onChange={(e) => updateSetting('autoStopOnQuit', e.target.checked)} />
-              <span>应用退出时自动停止容器</span>
-            </label>
-            <p className="help-text">关闭时自动停止容器以节省资源。取消勾选则容器在后台继续运行。</p>
-          </div>
-
-          <div className="setting-item">
-            <label>
-              <input type="checkbox" checked={settings.runInBackground} onChange={(e) => updateSetting('runInBackground', e.target.checked)} />
-              <span>后台运行模式</span>
-            </label>
-            <p className="help-text">关闭窗口时最小化到系统托盘</p>
-          </div>
-        </section>
-
-        {/* 资源限制 */}
-        <section className="settings-section">
-          <h3>资源限制</h3>
-
-          <div className="setting-item">
-            <label>内存限制</label>
-            <select value={settings.memoryLimit} onChange={(e) => updateSetting('memoryLimit', e.target.value)}>
-              <option value="50MB">50 MB</option>
-              <option value="100MB">100 MB</option>
-              <option value="200MB">200 MB</option>
-              <option value="500MB">500 MB</option>
-              <option value="1GB">1 GB</option>
-            </select>
-            <p className="help-text">容器最大内存使用量</p>
-          </div>
-
-          <div className="setting-item">
-            <label>CPU 限制</label>
-            <select value={settings.cpuLimit} onChange={(e) => updateSetting('cpuLimit', parseFloat(e.target.value))}>
-              <option value={0.25}>0.25 核心</option>
-              <option value={0.5}>0.5 核心</option>
-              <option value={1}>1 核心</option>
-              <option value={2}>2 核心</option>
-              <option value={4}>4 核心</option>
-            </select>
-            <p className="help-text">容器最大 CPU 使用量</p>
-          </div>
-        </section>
-
-        {/* 超时设置 */}
-        <section className="settings-section">
-          <h3>超时设置</h3>
-
-          <div className="setting-item">
-            <label>健康检查超时（秒）</label>
-            <input type="number" min={1} max={300} value={settings.healthCheckTimeout} onChange={(e) => updateSetting('healthCheckTimeout', parseInt(e.target.value))} />
-            <p className="help-text">健康检查请求的超时时间</p>
-          </div>
-
-          <div className="setting-item">
-            <label>启动超时（秒）</label>
-            <input type="number" min={10} max={600} value={settings.startupTimeout} onChange={(e) => updateSetting('startupTimeout', parseInt(e.target.value))} />
-            <p className="help-text">等待容器启动的最大时间</p>
-          </div>
-        </section>
-
-        {/* 端口配置 */}
-        <section className="settings-section">
-          <h3>端口配置</h3>
-
-          <div className="setting-item">
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.portConfig.autoSelectPort}
-                onChange={(e) =>
-                  updateSetting('portConfig', {
-                    ...settings.portConfig,
-                    autoSelectPort: e.target.checked,
-                  })
-                }
-              />
-              <span>自动选择可用端口</span>
-            </label>
-            <p className="help-text">如果端口被占用，自动尝试其他端口</p>
-          </div>
-
-          {!settings.portConfig.autoSelectPort && (
-            <div className="setting-item">
-              <label>Matrix 端口</label>
-              <input
-                type="number"
-                min={1024}
-                max={65535}
-                value={settings.portConfig.matrixPort}
-                onChange={(e) =>
-                  updateSetting('portConfig', {
-                    ...settings.portConfig,
-                    matrixPort: parseInt(e.target.value),
-                  })
-                }
-              />
-              <p className="help-text">Matrix 服务器监听端口（默认 8008）</p>
-            </div>
-          )}
-        </section>
-
-        {/* 日志级别 */}
-        <section className="settings-section">
-          <h3>日志级别</h3>
-
-          <div className="setting-item">
-            <label>日志详细程度</label>
-            <select value={settings.logLevel} onChange={(e) => updateSetting('logLevel', e.target.value as any)}>
-              <option value="error">仅错误</option>
-              <option value="warn">警告及以上</option>
-              <option value="info">信息及以上（推荐）</option>
-              <option value="debug">调试（详细）</option>
-            </select>
-            <p className="help-text">控制日志输出的详细程度</p>
-          </div>
-        </section>
-      </div>
-
-      <div className="settings-footer">
-        <button className="btn secondary" onClick={resetToDefaults} disabled={isSaving}>
+    <Modal
+      title={
+        <Space>
+          <SettingOutlined />
+          <span>容器设置</span>
+        </Space>
+      }
+      open={open}
+      onCancel={onClose}
+      width={600}
+      footer={[
+        <Button key="reset" icon={<ReloadOutlined />} onClick={handleReset} disabled={saving}>
           恢复默认
-        </button>
-        <button className="btn primary" onClick={saveSettings} disabled={isSaving}>
-          {isSaving ? '保存中...' : '保存设置'}
-        </button>
-      </div>
-    </div>
+        </Button>,
+        <Button key="cancel" onClick={onClose} disabled={saving}>
+          取消
+        </Button>,
+        <Button key="save" type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+          保存设置
+        </Button>,
+      ]}
+    >
+      <Spin spinning={loading}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            autoStartOnLaunch: true,
+            autoStopOnQuit: true,
+            runInBackground: false,
+            memoryLimit: '200MB',
+            cpuLimit: 1,
+            logLevel: 'info',
+            healthCheckTimeout: 60,
+            startupTimeout: 120,
+            portConfig: {
+              matrixPort: 8008,
+              autoSelectPort: true,
+            },
+          }}
+        >
+          <Card
+            size="small"
+            title={
+              <>
+                <RocketOutlined /> 启动行为
+              </>
+            }
+            style={{ marginBottom: 16 }}
+          >
+            <Form.Item name="autoStartOnLaunch" valuePropName="checked" label="应用启动时自动启动容器">
+              <Switch />
+              <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+                启动应用时自动启动 Matrix 容器
+              </Text>
+            </Form.Item>
+
+            <Form.Item name="autoStopOnQuit" valuePropName="checked" label="应用退出时自动停止容器">
+              <Switch />
+              <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+                关闭时自动停止容器以节省资源
+              </Text>
+            </Form.Item>
+
+            <Form.Item name="runInBackground" valuePropName="checked" label="后台运行模式">
+              <Switch />
+              <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+                关闭窗口时最小化到系统托盘
+              </Text>
+            </Form.Item>
+          </Card>
+
+          <Card
+            size="small"
+            title={
+              <>
+                <CloudServerOutlined /> 资源限制
+              </>
+            }
+            style={{ marginBottom: 16 }}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="memoryLimit" label="内存限制">
+                  <Select>
+                    <Option value="50MB">50 MB</Option>
+                    <Option value="100MB">100 MB</Option>
+                    <Option value="200MB">200 MB</Option>
+                    <Option value="500MB">500 MB</Option>
+                    <Option value="1GB">1 GB</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="cpuLimit" label="CPU 限制">
+                  <Select>
+                    <Option value={0.25}>0.25 核心</Option>
+                    <Option value={0.5}>0.5 核心</Option>
+                    <Option value={1}>1 核心</Option>
+                    <Option value={2}>2 核心</Option>
+                    <Option value={4}>4 核心</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card
+            size="small"
+            title={
+              <>
+                <ClockCircleOutlined /> 超时设置
+              </>
+            }
+            style={{ marginBottom: 16 }}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="healthCheckTimeout" label="健康检查超时（秒）">
+                  <InputNumber min={1} max={300} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="startupTimeout" label="启动超时（秒）">
+                  <InputNumber min={10} max={600} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card
+            size="small"
+            title={
+              <>
+                <ApiOutlined /> 端口配置
+              </>
+            }
+            style={{ marginBottom: 16 }}
+          >
+            <Form.Item name={['portConfig', 'autoSelectPort']} valuePropName="checked" label="自动选择可用端口">
+              <Switch />
+              <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+                如果端口被占用，自动尝试其他端口
+              </Text>
+            </Form.Item>
+
+            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.portConfig?.autoSelectPort !== curr.portConfig?.autoSelectPort}>
+              {({ getFieldValue }) => {
+                const autoSelect = getFieldValue(['portConfig', 'autoSelectPort']);
+                return !autoSelect ? (
+                  <Form.Item name={['portConfig', 'matrixPort']} label="Matrix 端口" rules={[{ required: true, message: '请输入端口' }]}>
+                    <InputNumber min={1024} max={65535} style={{ width: '100%' }} />
+                  </Form.Item>
+                ) : null;
+              }}
+            </Form.Item>
+          </Card>
+
+          <Card size="small" title="日志设置" style={{ marginBottom: 16 }}>
+            <Form.Item name="logLevel" label="日志详细程度">
+              <Select>
+                <Option value="error">仅错误</Option>
+                <Option value="warn">警告及以上</Option>
+                <Option value="info">信息及以上（推荐）</Option>
+                <Option value="debug">调试（详细）</Option>
+              </Select>
+            </Form.Item>
+          </Card>
+        </Form>
+      </Spin>
+    </Modal>
   );
 };
 

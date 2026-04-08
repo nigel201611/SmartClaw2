@@ -1,98 +1,76 @@
-/**
- * SmartClaw Log Viewer Component
- *
- * 容器日志查看器
- */
-
+// src/renderer/components/logs/LogViewer.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import { Modal, Button, Space, Input, Select, Switch, Typography, Tooltip, message, Spin, Tag, Tabs } from 'antd';
+import { DownloadOutlined, CopyOutlined, ReloadOutlined, CloseOutlined, PlayCircleOutlined, PauseCircleOutlined, ClearOutlined, SearchOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
+const { TextArea } = Input;
 
 interface LogViewerProps {
+  open: boolean;
   onClose?: () => void;
   autoRefresh?: boolean;
   refreshInterval?: number;
 }
 
-interface LogEntry {
-  timestamp: string;
-  level: 'info' | 'warn' | 'error' | 'debug';
-  message: string;
-}
-
-/**
- * 安全获取 Electron API
- */
 const getElectronAPI = (): IElectronAPI => {
   if (!window.electronAPI) {
-    throw new Error('Electron API not available. Please ensure preload script is loaded correctly.');
+    throw new Error('Electron API not available');
   }
   return window.electronAPI;
 };
 
-/**
- * 日志查看器组件
- */
-export const LogViewer: React.FC<LogViewerProps> = ({ onClose, autoRefresh = true, refreshInterval = 3000 }) => {
+export const LogViewer: React.FC<LogViewerProps> = ({ open, onClose, autoRefresh = true, refreshInterval = 3000 }) => {
   const [logs, setLogs] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [tailLines, setTailLines] = useState(200);
   const [isFollowing, setIsFollowing] = useState(true);
   const [filterText, setFilterText] = useState('');
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 加载日志
   const loadLogs = async () => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       const api = getElectronAPI();
+      let logData = await api.getContainerLogs();
 
-      // 使用 preload 中的 docker 日志方法
-      let logData: string;
-
-      if (tailLines === 99999) {
-        // 获取全部日志
-        logData = await api.getContainerLogs();
-      } else {
-        // 获取指定行数的日志
-        const logs = await api.getContainerLogs();
-        const lines = logs.split('\n');
-        const tailLines_ = lines.slice(-tailLines);
-        logData = tailLines_.join('\n');
+      if (tailLines !== 99999 && logData) {
+        const lines = logData.split('\n');
+        logData = lines.slice(-tailLines).join('\n');
       }
 
       setLogs(logData || '');
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || '获取日志失败');
+    } catch (error: any) {
+      message.error(error.message || '获取日志失败');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  // 初始加载
   useEffect(() => {
-    loadLogs();
-  }, [tailLines]);
-
-  // 自动刷新
-  useEffect(() => {
-    if (!autoRefresh || !isFollowing) return;
-
-    const interval = setInterval(() => {
+    if (open) {
       loadLogs();
-    }, refreshInterval);
+    }
+  }, [open, tailLines]);
 
-    return () => clearInterval(interval);
-  }, [autoRefresh, isFollowing, refreshInterval]);
+  useEffect(() => {
+    if (open && autoRefresh && isFollowing) {
+      intervalRef.current = setInterval(loadLogs, refreshInterval);
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [open, autoRefresh, isFollowing, refreshInterval]);
 
-  // 滚动到底部
   useEffect(() => {
     if (isFollowing && logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs, isFollowing]);
 
-  // 过滤日志
   const filteredLogs = filterText
     ? logs
         .split('\n')
@@ -100,30 +78,19 @@ export const LogViewer: React.FC<LogViewerProps> = ({ onClose, autoRefresh = tru
         .join('\n')
     : logs;
 
-  // 复制日志
   const copyLogs = async () => {
     try {
-      // 使用浏览器原生方法复制文本
       await navigator.clipboard.writeText(logs);
-      // 可选：显示成功提示
-      console.log('日志已复制到剪贴板');
-    } catch (err: any) {
-      setError('复制失败: ' + err.message);
+      message.success('日志已复制到剪贴板');
+    } catch (error) {
+      message.error('复制失败');
     }
   };
 
-  // 导出日志
-  const exportLogs = async () => {
+  const exportLogs = () => {
     try {
-      const api = getElectronAPI();
-
-      // 获取当前时间作为文件名
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `smartclaw-matrix-${timestamp}.log`;
-
-      // 使用 Electron 的 shell API 来保存文件
-      // 注意：preload 中没有直接的保存文件方法，需要添加
-      // 这里使用浏览器原生的下载方法作为替代
       const blob = new Blob([logs], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -133,123 +100,96 @@ export const LogViewer: React.FC<LogViewerProps> = ({ onClose, autoRefresh = tru
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError('导出失败: ' + err.message);
+      message.success('日志已导出');
+    } catch (error) {
+      message.error('导出失败');
     }
   };
 
-  // 清除日志（只清除显示，不清除实际日志）
   const clearLogs = () => {
     setLogs('');
+    message.info('显示已清除');
   };
 
-  // 解析日志级别（用于高亮）
-  const parseLogLevel = (line: string): 'info' | 'warn' | 'error' | 'debug' | null => {
-    if (line.includes('ERROR') || line.includes('error') || line.includes('❌')) return 'error';
-    if (line.includes('WARN') || line.includes('warn') || line.includes('⚠️')) return 'warn';
-    if (line.includes('DEBUG') || line.includes('debug') || line.includes('🔍')) return 'debug';
-    if (line.includes('INFO') || line.includes('info') || line.includes('ℹ️')) return 'info';
-    return null;
-  };
-
-  // 渲染高亮的日志行
-  const renderLogLine = (line: string, index: number) => {
-    const level = parseLogLevel(line);
-    let className = 'log-line';
-
-    if (level === 'error') className += ' log-error';
-    else if (level === 'warn') className += ' log-warn';
-    else if (level === 'debug') className += ' log-debug';
-
-    return (
-      <div key={index} className={className}>
-        {line || ' '}
-      </div>
-    );
+  const getLogColor = (line: string): string | undefined => {
+    if (line.includes('ERROR') || line.includes('error')) return '#ff4d4f';
+    if (line.includes('WARN') || line.includes('warn')) return '#faad14';
+    if (line.includes('DEBUG') || line.includes('debug')) return '#1890ff';
   };
 
   return (
-    <div className="log-viewer">
-      <div className="log-header">
-        <h2>容器日志</h2>
-        <div className="log-actions">
-          <button className={`btn ${isFollowing ? 'active' : ''}`} onClick={() => setIsFollowing(!isFollowing)} title="自动滚动到底部">
-            {isFollowing ? '📍 跟随' : '⏸ 暂停'}
-          </button>
-          <button className="btn" onClick={loadLogs} title="刷新">
-            🔄 刷新
-          </button>
-          <button className="btn" onClick={copyLogs} title="复制">
-            📋 复制
-          </button>
-          <button className="btn" onClick={exportLogs} title="导出">
-            💾 导出
-          </button>
-          <button className="btn" onClick={clearLogs} title="清除">
-            🗑 清除
-          </button>
-          {onClose && (
-            <button className="btn close" onClick={onClose}>
-              ×
-            </button>
-          )}
-        </div>
+    <Modal title="容器日志" open={open} onCancel={onClose} width="90%" style={{ top: 20 }} footer={null} bodyStyle={{ height: '70vh', padding: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: 12, borderBottom: '1px solid #f0f0f0', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <Space>
+          <Tooltip title={isFollowing ? '暂停跟随' : '开始跟随'}>
+            <Button icon={isFollowing ? <PauseCircleOutlined /> : <PlayCircleOutlined />} onClick={() => setIsFollowing(!isFollowing)} type={isFollowing ? 'primary' : 'default'}>
+              {isFollowing ? '跟随' : '暂停'}
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="刷新">
+            <Button icon={<ReloadOutlined />} onClick={loadLogs} />
+          </Tooltip>
+
+          <Tooltip title="复制">
+            <Button icon={<CopyOutlined />} onClick={copyLogs} />
+          </Tooltip>
+
+          <Tooltip title="导出">
+            <Button icon={<DownloadOutlined />} onClick={exportLogs} />
+          </Tooltip>
+
+          <Tooltip title="清除显示">
+            <Button icon={<ClearOutlined />} onClick={clearLogs} />
+          </Tooltip>
+        </Space>
+
+        <Input placeholder="过滤日志..." prefix={<SearchOutlined />} value={filterText} onChange={(e) => setFilterText(e.target.value)} allowClear style={{ width: 200 }} />
+
+        <Select
+          value={tailLines}
+          onChange={setTailLines}
+          style={{ width: 100 }}
+          options={[
+            { value: 50, label: '50 行' },
+            { value: 100, label: '100 行' },
+            { value: 200, label: '200 行' },
+            { value: 500, label: '500 行' },
+            { value: 1000, label: '1000 行' },
+            { value: 99999, label: '全部' },
+          ]}
+        />
       </div>
 
-      <div className="log-toolbar">
-        <div className="log-filter">
-          <input type="text" placeholder="过滤日志..." value={filterText} onChange={(e) => setFilterText(e.target.value)} className="filter-input" />
-          {filterText && (
-            <button onClick={() => setFilterText('')} className="clear-filter">
-              ×
-            </button>
-          )}
-        </div>
-
-        <div className="log-tail">
-          <label>显示行数：</label>
-          <select value={tailLines} onChange={(e) => setTailLines(parseInt(e.target.value))}>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={200}>200</option>
-            <option value={500}>500</option>
-            <option value={1000}>1000</option>
-            <option value={99999}>全部</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="log-content">
-        {isLoading && (
-          <div className="log-loading">
-            <div className="spinner" />
-            <p>加载日志中...</p>
+      <div style={{ flex: 1, overflow: 'auto', padding: 12, background: '#1e1e1e', color: '#d4d4d4', fontFamily: 'monospace' }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Spin />
           </div>
-        )}
-
-        {error && (
-          <div className="log-error">
-            <p>❌ {error}</p>
-            <button onClick={loadLogs}>重试</button>
-          </div>
-        )}
-
-        {!isLoading && !error && (
-          <div className="log-text">
-            {filteredLogs ? filteredLogs.split('\n').map((line, index) => renderLogLine(line, index)) : <div className="no-logs">暂无日志</div>}
+        ) : (
+          <>
+            {filteredLogs.split('\n').map((line, index) => (
+              <div key={index} style={{ color: getLogColor(line), fontSize: 12, lineHeight: 1.5 }}>
+                {line || ' '}
+              </div>
+            ))}
             <div ref={logsEndRef} />
-          </div>
+          </>
         )}
       </div>
 
-      <div className="log-footer">
-        <span className="log-stats">
+      <div style={{ padding: 8, borderTop: '1px solid #f0f0f0', background: '#fafafa', display: 'flex', justifyContent: 'space-between' }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
           {logs ? `${logs.split('\n').length} 行日志` : '无日志'}
           {filterText && ` (过滤后：${filteredLogs.split('\n').length} 行)`}
-        </span>
-        {isFollowing && <span className="live-indicator">🔴 实时</span>}
+        </Text>
+        {isFollowing && (
+          <Tag color="red" icon={<PlayCircleOutlined />}>
+            实时
+          </Tag>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 };
 

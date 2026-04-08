@@ -1,5 +1,7 @@
-// ConfirmDialog.tsx
-import React, { useEffect } from 'react';
+// src/renderer/components/chat/ConfirmDialog.tsx
+import React from 'react';
+import { Modal, Button, Space } from 'antd';
+import { ExclamationCircleOutlined, LogoutOutlined } from '@ant-design/icons';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -24,64 +26,27 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isLoading = false,
   confirmVariant = 'danger',
 }) => {
-  // ESC 键关闭
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !isLoading) {
-        onCancel();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'hidden';
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = '';
-    };
-  }, [isOpen, isLoading, onCancel]);
-
-  // 点击遮罩层关闭
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !isLoading) {
-      onCancel();
-    }
-  };
-
-  if (!isOpen) return null;
-
   return (
-    <div className="confirm-dialog-overlay" onClick={handleOverlayClick}>
-      <div className="confirm-dialog">
-        <div className="confirm-dialog-header">
-          <h3>{title}</h3>
-          <button className="confirm-dialog-close" onClick={onCancel} disabled={isLoading} aria-label="关闭">
-            ✕
-          </button>
-        </div>
-
-        <div className="confirm-dialog-body">
-          <p>{message}</p>
-        </div>
-
-        <div className="confirm-dialog-footer">
-          <button className="confirm-dialog-cancel" onClick={onCancel} disabled={isLoading}>
-            {cancelText}
-          </button>
-          <button className={`confirm-dialog-confirm confirm-dialog-confirm-${confirmVariant}`} onClick={onConfirm} disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <span className="spinner"></span>
-                处理中...
-              </>
-            ) : (
-              confirmText
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      title={
+        <Space>
+          <ExclamationCircleOutlined style={{ color: confirmVariant === 'danger' ? '#ff4d4f' : '#1890ff' }} />
+          <span>{title}</span>
+        </Space>
+      }
+      open={isOpen}
+      onCancel={onCancel}
+      footer={[
+        <Button key="cancel" onClick={onCancel} disabled={isLoading}>
+          {cancelText}
+        </Button>,
+        <Button key="confirm" type="primary" danger={confirmVariant === 'danger'} onClick={onConfirm} loading={isLoading} icon={confirmVariant === 'danger' ? <LogoutOutlined /> : undefined}>
+          {confirmText}
+        </Button>,
+      ]}
+      centered
+    >
+      <p>{message}</p>
+    </Modal>
   );
 };

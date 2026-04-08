@@ -1,17 +1,10 @@
-// RoomList.tsx
+// src/renderer/components/chat/RoomList.tsx
 import React, { useState } from 'react';
-import logo from '@/images/icon.png';
+import { Input, Button, Avatar, Badge, Tooltip, Empty, Typography, Space, List } from 'antd';
+import { SearchOutlined, PlusOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import type { DisplayRoom } from '../../types';
 
-export interface DisplayRoom {
-  roomId: string;
-  name: string;
-  topic?: string;
-  memberCount: number;
-  isDirect: boolean;
-  lastMessage?: string;
-  lastMessageTime?: Date;
-  unreadCount: number;
-}
+const { Text } = Typography;
 
 interface RoomListProps {
   rooms: DisplayRoom[];
@@ -27,48 +20,133 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoo
   const filteredRooms = rooms.filter((room) => room.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="room-list">
-      <div className="room-list-header">
-        <div className="logo-area">
-          <div className="logo-icon">
-            <img src={logo} width={30} height={30} alt="Logo" />
+    <div
+      style={{
+        width: 280,
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(20px)',
+        borderRight: '1px solid rgba(71, 85, 105, 0.3)',
+      }}
+    >
+      {/* 头部 */}
+      <div style={{ padding: '20px 16px', borderBottom: '1px solid rgba(71, 85, 105, 0.15)' }}>
+        <Space align="center">
+          <Avatar size="large" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}>
+            SC
+          </Avatar>
+          <div>
+            <Text strong style={{ fontSize: 20, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              SmartClaw
+            </Text>
           </div>
-          <div className="logo-text">SmartClaw</div>
-        </div>
+        </Space>
       </div>
 
-      <div className="room-search">
-        <input type="text" className="search-input" placeholder="搜索房间..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+      {/* 搜索框 */}
+      <div style={{ padding: 16 }}>
+        <Input
+          placeholder="搜索房间..."
+          prefix={<SearchOutlined style={{ color: '#64748b' }} />}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          allowClear
+          style={{
+            background: 'rgba(0, 0, 0, 0.3)',
+            border: '1px solid rgba(71, 85, 105, 0.2)',
+          }}
+        />
       </div>
 
-      <div className="rooms-container">
+      {/* 房间列表头部 */}
+      <div style={{ padding: '0 16px 8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text strong style={{ color: '#f1f5f9' }}>
+          房间列表
+        </Text>
+        <Tooltip title="创建房间">
+          <Button type="primary" icon={<PlusOutlined />} size="small" onClick={onCreateRoomClick} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', border: 'none' }}>
+            创建房间
+          </Button>
+        </Tooltip>
+      </div>
+
+      {/* 房间列表 */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 8px' }}>
         {filteredRooms.length === 0 ? (
-          <div className="empty-state">
-            <p>{rooms.length === 0 ? '暂无房间' : '未找到匹配的房间'}</p>
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span style={{ color: '#94a3b8' }}>{rooms.length === 0 ? '暂无房间' : '未找到匹配的房间'}</span>} style={{ marginTop: 40 }}>
             {rooms.length === 0 && (
-              <button className="create-first-room-btn" onClick={onCreateRoomClick}>
+              <Button type="primary" onClick={onCreateRoomClick} icon={<PlusOutlined />}>
                 创建第一个房间
-              </button>
+              </Button>
             )}
-          </div>
+          </Empty>
         ) : (
           filteredRooms.map((room) => (
-            <div key={room.roomId} className={`room-item ${selectedRoomId === room.roomId ? 'active' : ''}`} onClick={() => onRoomSelect(room.roomId)}>
-              <div className="room-info">
-                <span className="room-name">{room.name}</span>
-                {room.topic && <span className="room-topic">{room.topic}</span>}
+            <div
+              key={room.roomId}
+              onClick={() => onRoomSelect(room.roomId)}
+              style={{
+                cursor: 'pointer',
+                padding: '12px',
+                borderRadius: 12,
+                marginBottom: 4,
+                transition: 'all 0.2s',
+                background: selectedRoomId === room.roomId ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                borderLeft: selectedRoomId === room.roomId ? '3px solid #6366f1' : '3px solid transparent',
+                overflow: 'hidden',
+              }}
+              onMouseEnter={(e) => {
+                if (selectedRoomId !== room.roomId) {
+                  e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (selectedRoomId !== room.roomId) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', minWidth: 0 }}>
+                {room.isDirect ? (
+                  <Avatar icon={<UserOutlined />} style={{ background: '#10b981', flexShrink: 0 }} />
+                ) : (
+                  <Avatar style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', flexShrink: 0 }}>{room.name.charAt(0).toUpperCase()}</Avatar>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <Text strong={selectedRoomId === room.roomId} style={{ color: '#f1f5f9', fontSize: 14 }} ellipsis={{ tooltip: true }}>
+                      {room.name}
+                    </Text>
+                    {room.unreadCount > 0 && <Badge count={room.unreadCount} size="small" style={{ flexShrink: 0 }} />}
+                  </div>
+                  {room.lastMessage && (
+                    <Text type="secondary" style={{ fontSize: 12, color: '#94a3b8', display: 'block' }} ellipsis={{ tooltip: true }}>
+                      {room.lastMessage}
+                    </Text>
+                  )}
+                </div>
               </div>
-              {room.isDirect && <span className="direct-badge">私聊</span>}
-              {room.unreadCount > 0 && <span className="unread-badge">{room.unreadCount}</span>}
             </div>
           ))
         )}
       </div>
 
-      <div className="room-list-footer">
-        <button className="logout-btn" onClick={onLogoutClick}>
-          <span>退出登录</span>
-        </button>
+      {/* 底部 */}
+      <div style={{ padding: 16, borderTop: '1px solid rgba(71, 85, 105, 0.15)' }}>
+        <Button
+          danger
+          icon={<LogoutOutlined />}
+          onClick={onLogoutClick}
+          block
+          style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+          }}
+        >
+          退出登录
+        </Button>
       </div>
     </div>
   );

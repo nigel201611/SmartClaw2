@@ -734,10 +734,10 @@ export class AppStartupManager {
     });
 
     // 创建房间
-    ipcMain.handle('matrix:create-room', async (event, name: string, topic?: string) => {
-      if (!this.matrixService) throw new Error('Matrix service not available');
-      return await this.matrixService.createRoom(name, topic);
-    });
+    // ipcMain.handle('matrix:create-room', async (event, name: string, topic?: string) => {
+    //   if (!this.matrixService) throw new Error('Matrix service not available');
+    //   return await this.matrixService.createRoom(name, topic);
+    // });
 
     // 获取房间消息
     ipcMain.handle('matrix:get-messages', async (event, roomId: string, limit?: number) => {

@@ -22,7 +22,6 @@ interface CreateRoomOptions {
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({ onLogout }) => {
   const { isLoggedIn, session, rooms, messages, getRooms, getRoomMessages, sendMessage, logout, isLoading, error, createRoom } = useMatrix({
-    autoConnect: true,
     homeserverUrl: 'http://localhost:8008',
   });
 
@@ -34,7 +33,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ onLogout }) => {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const messageListRef = useRef<HTMLDivElement>(null);
 
+  // 加载房间列表 - 确保登录后能获取到房间
+  useEffect(() => {
+    const loadRooms = async () => {
+      if (isLoggedIn) {
+        console.log('Loading rooms in ChatWindow...');
+        await getRooms();
+      }
+    };
+
+    loadRooms();
+  }, [isLoggedIn, getRooms]);
   // 格式化房间列表
+
   const formattedRooms = rooms.map((room) => ({
     roomId: room.roomId,
     name: room.name,
@@ -51,12 +62,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ onLogout }) => {
 
   // 格式化消息列表
   const formattedMessages = messages.map((msg) => ({
-    id: msg.eventId,
-    text: msg.content.body,
-    sender: msg.sender,
-    timestamp: new Date(msg.timestamp),
-    isOwn: msg.sender === session?.userId,
+    roomId: msg.roomId,
     eventId: msg.eventId,
+    sender: msg.sender,
+    timestamp: msg.timestamp,
+    content: {
+      msgtype: 'm.text',
+      body: msg.content.body,
+      formatted_body: msg.content.formatted_body,
+    },
+    type: msg.type,
   }));
 
   // 加载房间列表

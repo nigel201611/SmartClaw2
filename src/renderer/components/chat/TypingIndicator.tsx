@@ -1,5 +1,9 @@
-// TypingIndicator.tsx
+// src/renderer/components/chat/TypingIndicator.tsx
 import React, { useEffect, useState } from 'react';
+import { Space, Typography } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
 
 interface TypingIndicatorProps {
   roomId: string | null;
@@ -24,13 +28,19 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ roomId, typing
   if (!displayText) return null;
 
   return (
-    <div className="typing-indicator">
-      <div className="typing-dots">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-      <span>{displayText}</span>
+    <div
+      style={{
+        padding: '8px 24px',
+        borderTop: '1px solid #f0f0f0',
+        backgroundColor: '#fafafa',
+      }}
+    >
+      <Space>
+        <LoadingOutlined style={{ color: '#667eea' }} />
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {displayText}
+        </Text>
+      </Space>
     </div>
   );
 };

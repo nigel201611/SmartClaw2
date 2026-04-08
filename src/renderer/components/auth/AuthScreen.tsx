@@ -1,150 +1,92 @@
 // src/renderer/components/auth/AuthScreen.tsx
-import React, { useState, useEffect } from 'react';
-import { LoginDialog } from './LoginDialog';
-import { RegisterDialog } from './RegisterDialog';
+import React, { useState } from 'react';
+import { Form, Input, Button, Card, Typography, Alert, Space, Switch, Tabs } from 'antd';
+import { UserOutlined, LockOutlined, CloudServerOutlined, MailOutlined } from '@ant-design/icons';
 import { useMatrix } from '../../hooks/useMatrix';
 
+const { Title, Text } = Typography;
+
 interface AuthScreenProps {
-  onAuthenticated: () => void;
+  onAuthenticated?: () => void;
 }
 
-type AuthView = 'login' | 'register';
-
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
-  const [view, setView] = useState<AuthView>('login');
-  const [error, setError] = useState<string | null>(null);
+  const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const { login, register, error } = useMatrix();
 
-  // 使用 useMatrix Hook
-  const {
-    login,
-    isLoggedIn,
-    isLoading,
-    error: matrixError,
-    rooms, // 添加 rooms 用于调试
-  } = useMatrix({
-    autoConnect: false,
-    onSyncStateChange: (state) => {
-      console.log('Sync state:', state);
-    },
-    onRoomUpdate: (rooms) => {
-      console.log('Rooms updated in AuthScreen:', rooms);
-    },
-  });
-
-  useEffect(() => {
-    if (!window.electronAPI) {
-      setError('Electron API 不可用，请重启应用');
-    }
-  }, []);
-
-  // 监听登录状态变化
-  useEffect(() => {
-    if (isLoggedIn) {
-      console.log('Login successful, triggering onAuthenticated');
-      onAuthenticated();
-    }
-  }, [isLoggedIn, onAuthenticated]);
-
-  // 调试：监听 rooms 变化
-  useEffect(() => {
-    if (rooms.length > 0) {
-      console.log('Rooms available in AuthScreen:', rooms);
-    }
-  }, [rooms]);
-
-  const handleLogin = async (username: string, password: string, homeserverUrl: string, rememberMe: boolean): Promise<boolean> => {
-    setError(null);
-
+  const onFinish = async (values: any) => {
+    setLoading(true);
     try {
-      console.log('Testing server connection:', homeserverUrl);
-      const testUrl = `${homeserverUrl}/_matrix/client/versions`;
-      const testResponse = await fetch(testUrl);
-      if (!testResponse.ok) {
-        throw new Error(`服务器连接失败: ${testResponse.status}`);
-      }
-      // 使用 useMatrix 的 login 方法
-      const success = await login(username, password, homeserverUrl);
-      console.log('Login result:', success);
-
-      // 如果需要记住密码，保存用户名和服务器地址
-      if (success && rememberMe) {
-        localStorage.setItem('lastHomeserver', homeserverUrl);
-        localStorage.setItem('lastUsername', username);
-      }
-
-      return success;
-    } catch (err: any) {
-      console.error('Login exception:', err);
-      setError(err.message || '登录失败');
-      return false;
-    }
-  };
-
-  const handleRegister = async (username: string, password: string, homeserverUrl: string, token?: string): Promise<boolean> => {
-    setError(null);
-
-    try {
-      if (!window.electronAPI) {
-        throw new Error('Electron API 不可用');
-      }
-
-      console.log('Registering user:', username);
-      const result = await window.electronAPI.register(homeserverUrl, username, password, token);
-
-      console.log('Register result:', result);
-
-      if (result && result.userId) {
-        console.log('Registration successful, auto-logging in...');
-
-        // 注册成功后自动登录
-        const loginSuccess = await login(username, password, homeserverUrl);
-
-        if (loginSuccess) {
-          return true;
-        } else {
-          setError('注册成功但自动登录失败，请手动登录');
-          setView('login');
-          return false;
+      if (isLogin) {
+        const success = await login(values.username, values.password, values.homeserver);
+        if (success && onAuthenticated) {
+          onAuthenticated();
         }
       } else {
-        setError(result?.error || '注册失败');
-        return false;
+        const success = await register(values.username, values.password, values.email, values.homeserver);
+        if (success && onAuthenticated) {
+          onAuthenticated();
+        }
       }
-    } catch (err: any) {
-      console.error('Register exception:', err);
-      setError(err.message || '注册失败');
-      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const switchToLogin = () => {
-    setView('login');
-    setError(null);
-  };
-
-  const switchToRegister = () => {
-    setView('register');
-    setError(null);
-  };
-
-  const displayError = error || matrixError;
-
   return (
-    <div className="auth-screen">
-      <div className="auth-content">
-        {view === 'login' ? (
-          <LoginDialog onLogin={handleLogin} onSwitchToRegister={switchToRegister} error={displayError} isLoading={isLoading} />
-        ) : (
-          <RegisterDialog onRegister={handleRegister} onSwitchToLogin={switchToLogin} error={displayError} isLoading={isLoading} />
-        )}
-      </div>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      }}
+    >
+      <Card style={{ width: 450, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <Title level={2}>SmartClaw</Title>
+          <Text type="secondary">Matrix 即时通讯客户端</Text>
+        </div>
 
-      <div className="auth-footer">
-        <p>✨ SmartClaw v2.0 Standalone</p>
-        <p className="hint">本地 Matrix 服务器桌面客户端</p>
-      </div>
+        <Tabs activeKey={isLogin ? 'login' : 'register'} onChange={(key) => setIsLogin(key === 'login')}>
+          <Tabs.TabPane tab="登录" key="login" />
+          <Tabs.TabPane tab="注册" key="register" />
+        </Tabs>
+
+        <Form name="auth" onFinish={onFinish} autoComplete="off" layout="vertical">
+          <Form.Item label="服务器地址" name="homeserver" initialValue="http://localhost:8008" rules={[{ required: true, message: '请输入服务器地址' }]}>
+            <Input prefix={<CloudServerOutlined />} placeholder="http://localhost:8008" />
+          </Form.Item>
+
+          <Form.Item label="用户名" name="username" rules={[{ required: true, message: '请输入用户名' }]}>
+            <Input prefix={<UserOutlined />} placeholder="username" />
+          </Form.Item>
+
+          {!isLogin && (
+            <Form.Item label="邮箱" name="email" rules={[{ type: 'email', message: '请输入有效的邮箱地址' }]}>
+              <Input prefix={<MailOutlined />} placeholder="email@example.com" />
+            </Form.Item>
+          )}
+
+          <Form.Item label="密码" name="password" rules={[{ required: true, message: '请输入密码' }]}>
+            <Input.Password prefix={<LockOutlined />} placeholder="password" />
+          </Form.Item>
+
+          {error && (
+            <Form.Item>
+              <Alert message="错误" description={error} type="error" showIcon />
+            </Form.Item>
+          )}
+
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={loading} block size="large">
+              {isLogin ? '登录' : '注册'}
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
     </div>
   );
 };
-
-export default AuthScreen;

@@ -1,34 +1,29 @@
-import React, { useState, useEffect } from 'react';
+// src/renderer/App.tsx
+import React, { useEffect } from 'react';
+import { ConfigProvider } from 'antd';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { ChatWindow } from './components/chat/ChatWindow';
+import { useMatrixStore } from './stores/matrixStore';
+import { antdTheme } from './theme/antd-theme';
 import './styles/index.css';
 
-interface AppState {
-  dockerReady: boolean;
-}
-
 export function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const handleAuthSuccess = () => {
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-  };
+  const isLoggedIn = useMatrixStore((state) => state.isLoggedIn);
+  const reset = useMatrixStore((state) => state.reset);
 
   useEffect(() => {
-    window.electronAPI?.onAuthStatus?.((authenticated: boolean) => {
-      setIsAuthenticated(authenticated);
+    const unsubscribe = window.electronAPI?.onAuthStatus?.((authenticated: boolean) => {
+      if (!authenticated) {
+        reset();
+      }
     });
-  }, []);
 
-  if (!isAuthenticated) {
-    return <AuthScreen onAuthenticated={handleAuthSuccess} />;
-  }
+    return () => {
+      unsubscribe?.();
+    };
+  }, [reset]);
 
-  return <ChatWindow onLogout={handleLogout} />;
+  return <ConfigProvider theme={antdTheme}>{!isLoggedIn ? <AuthScreen /> : <ChatWindow />}</ConfigProvider>;
 }
 
 export default App;

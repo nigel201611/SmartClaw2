@@ -1,5 +1,9 @@
-// MessageInput.tsx - 优化的消息输入组件
+// src/renderer/components/chat/MessageInput.tsx
 import React, { useState, KeyboardEvent } from 'react';
+import { Input, Button, Space } from 'antd';
+import { SendOutlined } from '@ant-design/icons';
+
+const { TextArea } = Input;
 
 interface MessageInputProps {
   onSend: (text: string) => void;
@@ -23,22 +27,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({ onSend, disabled }) 
     }
   };
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
-    // 自动调整高度
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
-  };
-
   return (
-    <div className="message-input-container">
-      <div className="input-wrapper">
-        <textarea className="message-input" value={message} onChange={handleInput} onKeyPress={handleKeyPress} placeholder="输入消息... (Enter 发送，Shift+Enter 换行)" disabled={disabled} rows={1} />
-        <button className="send-btn" onClick={handleSend} disabled={!message.trim() || disabled}>
-          <span>📤</span>
-          <span>发送</span>
-        </button>
-      </div>
+    <div style={{ padding: 16, borderTop: '1px solid #f0f0f0' }}>
+      <Space.Compact style={{ width: '100%' }}>
+        <TextArea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="输入消息... (Enter 发送，Shift+Enter 换行)"
+          disabled={disabled}
+          autoSize={{ minRows: 1, maxRows: 4 }}
+          style={{ resize: 'none' }}
+        />
+        <Button type="primary" icon={<SendOutlined />} onClick={handleSend} disabled={!message.trim() || disabled}>
+          发送
+        </Button>
+      </Space.Compact>
     </div>
   );
 };

@@ -1,7 +1,12 @@
-// RegisterDialog.tsx
+// src/renderer/components/auth/RegisterDialog.tsx
 import React, { useState } from 'react';
+import { Modal, Form, Input, Button, Alert, Typography, Space } from 'antd';
+import { UserOutlined, LockOutlined, GlobalOutlined, MailOutlined, KeyOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons';
+
+const { Text, Link } = Typography;
 
 interface RegisterDialogProps {
+  open: boolean;
   onRegister: (username: string, password: string, homeserverUrl: string, token?: string, email?: string) => Promise<boolean>;
   onSwitchToLogin?: () => void;
   onClose?: () => void;
@@ -12,87 +17,28 @@ interface RegisterDialogProps {
 }
 
 export const RegisterDialog: React.FC<RegisterDialogProps> = ({
+  open,
   onRegister,
   onSwitchToLogin,
   onClose,
   defaultHomeserver = 'http://localhost:8008',
-  defaultToken = 'smartclaw123', // 预设默认 token
+  defaultToken = 'smartclaw123',
   error: externalError,
   isLoading: externalLoading = false,
 }) => {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    confirmPassword: '',
-    email: '',
-    homeserverUrl: defaultHomeserver,
-    registrationToken: defaultToken,
-  });
-  const [showPassword, setShowPassword] = useState(false);
+  const [form] = Form.useForm();
   const [internalLoading, setInternalLoading] = useState(false);
   const [internalError, setInternalError] = useState<string | null>(null);
 
   const isLoading = externalLoading || internalLoading;
   const error = externalError || internalError;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (internalError) setInternalError(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (values: any) => {
     setInternalError(null);
     setInternalLoading(true);
 
     try {
-      // 验证用户名
-      if (!formData.username.trim()) {
-        throw new Error('请输入用户名');
-      }
-
-      const usernameRegex = /^[a-z0-9._=-]+$/i;
-      if (!usernameRegex.test(formData.username.trim())) {
-        throw new Error('用户名只能包含字母、数字、点、下划线、连字符');
-      }
-
-      if (formData.username.length < 3) {
-        throw new Error('用户名长度至少为 3 个字符');
-      }
-
-      // 验证密码
-      if (!formData.password) {
-        throw new Error('请输入密码');
-      }
-
-      if (formData.password.length < 6) {
-        throw new Error('密码长度至少为 6 位');
-      }
-
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error('两次输入的密码不一致');
-      }
-
-      // 验证注册令牌
-      if (!formData.registrationToken) {
-        throw new Error('请输入注册令牌');
-      }
-
-      // 验证服务器地址
-      if (!formData.homeserverUrl) {
-        throw new Error('请输入服务器地址');
-      }
-
-      // 验证邮箱（可选）
-      if (formData.email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(formData.email)) {
-          throw new Error('邮箱格式不正确');
-        }
-      }
-
-      const success = await onRegister(formData.username.trim(), formData.password, formData.homeserverUrl, formData.registrationToken, formData.email || undefined);
+      const success = await onRegister(values.username.trim(), values.password, values.homeserverUrl, values.registrationToken, values.email);
 
       if (!success) {
         throw new Error('注册失败，请检查令牌是否正确或用户名是否已存在');
@@ -105,111 +51,120 @@ export const RegisterDialog: React.FC<RegisterDialogProps> = ({
   };
 
   return (
-    <div className="auth-dialog-overlay" onClick={onClose}>
-      <div className="auth-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="auth-dialog-header">
-          <h1>创建新账户</h1>
-          <p>加入 SmartClaw 聊天网络</p>
+    <Modal title="创建新账户" open={open} onCancel={onClose} footer={null} width={450} centered>
+      <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
+        加入 SmartClaw 聊天网络
+      </Text>
+
+      <Form
+        form={form}
+        name="register"
+        onFinish={handleSubmit}
+        autoComplete="off"
+        layout="vertical"
+        initialValues={{
+          homeserverUrl: defaultHomeserver,
+          registrationToken: defaultToken,
+        }}
+      >
+        {error && (
+          <Form.Item>
+            <Alert message="错误" description={error} type="error" showIcon />
+          </Form.Item>
+        )}
+
+        <Form.Item
+          name="homeserverUrl"
+          label="服务器地址"
+          rules={[
+            { required: true, message: '请输入服务器地址' },
+            { type: 'url', message: '请输入有效的 URL 地址' },
+          ]}
+        >
+          <Input prefix={<GlobalOutlined />} placeholder="http://localhost:8008" disabled={isLoading} />
+        </Form.Item>
+
+        <Form.Item name="registrationToken" label="注册令牌" rules={[{ required: true, message: '请输入注册令牌' }]}>
+          <Input prefix={<KeyOutlined />} placeholder="请输入注册令牌" disabled={isLoading} />
+        </Form.Item>
+
+        <Form.Item
+          name="username"
+          label="用户名"
+          rules={[
+            { required: true, message: '请输入用户名' },
+            { min: 3, message: '用户名至少3个字符' },
+            { pattern: /^[a-z0-9._=-]+$/i, message: '用户名只能包含字母、数字、点、下划线、连字符' },
+          ]}
+        >
+          <Input prefix={<UserOutlined />} placeholder="username" disabled={isLoading} autoComplete="username" />
+        </Form.Item>
+
+        <Form.Item name="email" label="邮箱（可选）" rules={[{ type: 'email', message: '请输入有效的邮箱地址' }]}>
+          <Input prefix={<MailOutlined />} placeholder="your@email.com" disabled={isLoading} autoComplete="email" />
+        </Form.Item>
+
+        <Form.Item
+          name="password"
+          label="密码"
+          rules={[
+            { required: true, message: '请输入密码' },
+            { min: 6, message: '密码至少6个字符' },
+          ]}
+        >
+          <Input.Password
+            prefix={<LockOutlined />}
+            placeholder="请输入密码（至少6位）"
+            disabled={isLoading}
+            autoComplete="new-password"
+            iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="confirmPassword"
+          label="确认密码"
+          dependencies={['password']}
+          rules={[
+            { required: true, message: '请确认密码' },
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                if (!value || getFieldValue('password') === value) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(new Error('两次输入的密码不一致'));
+              },
+            }),
+          ]}
+        >
+          <Input.Password
+            prefix={<LockOutlined />}
+            placeholder="请再次输入密码"
+            disabled={isLoading}
+            autoComplete="new-password"
+            iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+          />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="primary" htmlType="submit" loading={isLoading} block size="large">
+            注册
+          </Button>
+        </Form.Item>
+
+        <div style={{ textAlign: 'center' }}>
+          <Text type="secondary">
+            已有账户？ <Link onClick={onSwitchToLogin}>立即登录</Link>
+          </Text>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          {error && (
-            <div className="form-error">
-              <span>⚠️</span>
-              {error}
-            </div>
-          )}
-
-          <div className="form-group">
-            <label htmlFor="homeserverUrl">服务器地址</label>
-            <input id="homeserverUrl" name="homeserverUrl" type="url" value={formData.homeserverUrl} onChange={handleChange} placeholder="http://localhost:8008" disabled={isLoading} required />
-            <p className="form-hint">Matrix 服务器的 URL 地址</p>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="registrationToken">注册令牌</label>
-            <input id="registrationToken" name="registrationToken" type="text" value={formData.registrationToken} onChange={handleChange} placeholder="请输入注册令牌" disabled={isLoading} required />
-            <p className="form-hint">
-              🔑 注册令牌: <code>smartclaw123</code>
-            </p>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="username">用户名</label>
-            <input id="username" name="username" type="text" value={formData.username} onChange={handleChange} placeholder="username" disabled={isLoading} autoComplete="username" required />
-            <p className="form-hint">用户名将显示为 @username:localhost</p>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">邮箱（可选）</label>
-            <input id="email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="your@email.com" disabled={isLoading} autoComplete="email" />
-            <p className="form-hint">用于密码找回和通知</p>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">密码</label>
-            <div className="password-input">
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="请输入密码（至少6位）"
-                disabled={isLoading}
-                autoComplete="new-password"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="confirmPassword">确认密码</label>
-            <div className="password-input">
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="请再次输入密码"
-                disabled={isLoading}
-                autoComplete="new-password"
-                required
-              />
-              <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                {showPassword ? '🙈' : '👁️'}
-              </button>
-            </div>
-          </div>
-
-          <div className="form-actions">
-            <button type="submit" className="btn btn-primary btn-block" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <span className="spinner-small" />
-                  注册中...
-                </>
-              ) : (
-                '注册'
-              )}
-            </button>
-          </div>
-        </form>
-
-        <div className="auth-dialog-footer">
-          <p>
-            已有账户？{' '}
-            <button type="button" className="btn-link" onClick={onSwitchToLogin}>
-              立即登录
-            </button>
-          </p>
-          <p className="hint">
+        <div style={{ marginTop: 16, textAlign: 'center' }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             💡 注册令牌: <code>smartclaw123</code>
-          </p>
+          </Text>
         </div>
-      </div>
-    </div>
+      </Form>
+    </Modal>
   );
 };
 

@@ -1,11 +1,10 @@
-/**
- * SmartClaw Room Item Component
- * 
- * 房间列表项
- */
-
+// src/renderer/components/chat/RoomItem.tsx
 import React from 'react';
-import { RoomInfo } from '../../hooks/useMatrix';
+import { Avatar, Badge, Typography, Space, Tooltip } from 'antd';
+import { UserOutlined, TeamOutlined } from '@ant-design/icons';
+import type { RoomInfo } from '../../types';
+
+const { Text } = Typography;
 
 interface RoomItemProps {
   room: RoomInfo;
@@ -14,22 +13,14 @@ interface RoomItemProps {
   onClick: () => void;
 }
 
-/**
- * 房间项组件
- */
-export const RoomItem: React.FC<RoomItemProps> = ({
-  room,
-  isSelected,
-  unreadCount,
-  onClick
-}) => {
+export const RoomItem: React.FC<RoomItemProps> = ({ room, isSelected, unreadCount, onClick }) => {
   // 格式化最后消息时间
   const formatTime = (timestamp: number): string => {
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) {
       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     } else if (days === 1) {
@@ -46,54 +37,63 @@ export const RoomItem: React.FC<RoomItemProps> = ({
     if (!room.lastMessage) {
       return '暂无消息';
     }
-    
+
     const content = room.lastMessage.content.body;
     return content.length > 30 ? content.substring(0, 30) + '...' : content;
   };
 
-  // 获取房间头像
-  const getRoomAvatar = (): string => {
-    if (room.isDirect) {
-      return '👤';
-    } else {
-      return room.name.charAt(0).toUpperCase();
-    }
-  };
-
   return (
     <div
-      className={`room-item ${isSelected ? 'selected' : ''}`}
       onClick={onClick}
+      style={{
+        padding: '12px 16px',
+        cursor: 'pointer',
+        transition: 'all 0.3s',
+        backgroundColor: isSelected ? '#e6f7ff' : 'transparent',
+        borderLeft: isSelected ? '3px solid #667eea' : '3px solid transparent',
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = '#f5f5f5';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }
+      }}
     >
-      <div className="room-avatar">
-        {room.isDirect ? (
-          <span className="avatar-direct">👤</span>
-        ) : (
-          <span className="avatar-group">{getRoomAvatar()}</span>
-        )}
-      </div>
-      
-      <div className="room-content">
-        <div className="room-header">
-          <h3 className="room-name" title={room.name}>
-            {room.name}
-          </h3>
-          {room.lastMessage && (
-            <span className="room-time">
-              {formatTime(room.lastMessage.timestamp)}
-            </span>
-          )}
+      <Space align="start" style={{ width: '100%' }}>
+        <Avatar
+          size={40}
+          style={{
+            backgroundColor: room.isDirect ? '#52c41a' : '#667eea',
+            flexShrink: 0,
+          }}
+        >
+          {room.isDirect ? <UserOutlined /> : room.name.charAt(0).toUpperCase()}
+        </Avatar>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text strong={isSelected} style={{ fontSize: 14 }}>
+              {room.name}
+            </Text>
+            {room.lastMessage && (
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                {formatTime(room.lastMessage.timestamp)}
+              </Text>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+            <Text type="secondary" style={{ fontSize: 12 }} ellipsis={{ tooltip: true }}>
+              {getLastMessagePreview()}
+            </Text>
+            {unreadCount > 0 && <Badge count={unreadCount} size="small" />}
+          </div>
         </div>
-        
-        <div className="room-footer">
-          <p className="room-last-message" title={getLastMessagePreview()}>
-            {getLastMessagePreview()}
-          </p>
-          {unreadCount > 0 && (
-            <span className="unread-badge">{unreadCount}</span>
-          )}
-        </div>
-      </div>
+      </Space>
     </div>
   );
 };

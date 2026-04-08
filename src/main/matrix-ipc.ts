@@ -22,7 +22,7 @@ export const MATRIX_IPC_CHANNELS = {
   // 房间操作
   // GET_ROOMS: 'matrix:get-rooms',
   GET_ROOM: 'matrix:get-room',
-  // CREATE_ROOM: 'matrix:create-room',
+  CREATE_ROOM: 'matrix:create-room',
   JOIN_ROOM: 'matrix:join-room',
   LEAVE_ROOM: 'matrix:leave-room',
 
@@ -167,17 +167,17 @@ export function registerMatrixIPCHandlers(mainWindow: BrowserWindow) {
   });
 
   // 创建房间
-  // ipcMain.handle(MATRIX_IPC_CHANNELS.CREATE_ROOM, async (event, options: { name?: string; topic?: string; isDirect?: boolean }): Promise<MatrixIPCResponse<string>> => {
-  //   try {
-  //     const roomId = await client.createRoom(options);
-  //     return { success: true, data: roomId };
-  //   } catch (error: any) {
-  //     return {
-  //       success: false,
-  //       error: error.message || '创建房间失败',
-  //     };
-  //   }
-  // });
+  ipcMain.handle(MATRIX_IPC_CHANNELS.CREATE_ROOM, async (event, options: { name?: string; topic?: string; isDirect?: boolean }): Promise<MatrixIPCResponse<string>> => {
+    try {
+      const roomId = await client.createRoom(options);
+      return { success: true, data: roomId };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || '创建房间失败',
+      };
+    }
+  });
 
   // 加入房间
   ipcMain.handle(MATRIX_IPC_CHANNELS.JOIN_ROOM, async (event, roomIdOrAlias: string): Promise<MatrixIPCResponse<RoomInfo>> => {

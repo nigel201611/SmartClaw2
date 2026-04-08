@@ -187,7 +187,7 @@ export class MatrixService {
    * 创建房间
    */
   async createRoom(name: string, topic?: string) {
-    return this.client.createRoom({ name, topic });
+    return this.client.createRoom({ name });
   }
 
   /**

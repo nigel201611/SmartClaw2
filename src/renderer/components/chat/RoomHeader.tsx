@@ -16,7 +16,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({ room }) => {
       style={{
         height: 70,
         padding: '0 24px',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid rgba(71, 85, 105, 0.15)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

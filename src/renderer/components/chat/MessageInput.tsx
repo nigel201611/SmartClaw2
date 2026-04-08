@@ -28,7 +28,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ onSend, disabled }) 
   };
 
   return (
-    <div style={{ padding: 16, borderTop: '1px solid #f0f0f0' }}>
+    <div style={{ padding: 16, borderTop: '1px solid rgba(71, 85, 105, 0.15)' }}>
       <Space.Compact style={{ width: '100%' }}>
         <TextArea
           value={message}

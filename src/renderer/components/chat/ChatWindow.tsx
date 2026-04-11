@@ -1,5 +1,7 @@
-// ChatWindow.tsx
-import React, { useState, useEffect, useRef } from 'react';
+// src/renderer/components/chat/ChatWindow.tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { message, Modal } from 'antd';
+import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { useMatrix } from '../../hooks/useMatrix';
 import { RoomList } from './RoomList';
 import { MessageList } from './MessageList';
@@ -7,91 +9,72 @@ import { MessageInput } from './MessageInput';
 import { RoomHeader } from './RoomHeader';
 import { TypingIndicator } from './TypingIndicator';
 import { CreateRoomDialog } from './CreateRoomDialog';
-import { ConfirmDialog } from './ConfirmDialog';
+import type { DisplayRoom, Message, MessageContent, RoomInfo } from '../../types';
 
 interface ChatWindowProps {
   onLogout?: () => void;
 }
 
-interface CreateRoomOptions {
-  name: string;
-  topic?: string;
-  isDirect?: boolean;
-  inviteUserIds?: string[];
-}
-
 export const ChatWindow: React.FC<ChatWindowProps> = ({ onLogout }) => {
-  const { isLoggedIn, session, rooms, messages, getRooms, getRoomMessages, sendMessage, logout, isLoading, error, createRoom } = useMatrix({
-    homeserverUrl: 'http://localhost:8008',
-  });
+  const { isLoggedIn, session, rooms, messages, getRooms, getRoomMessages, sendMessage, logout, isLoading, error, createRoom, deleteRoomIntelligent, checkRoomNameExists, clearError } = useMatrix();
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const messageListRef = useRef<HTMLDivElement>(null);
 
-  // 加载房间列表 - 确保登录后能获取到房间
-  useEffect(() => {
-    const loadRooms = async () => {
-      if (isLoggedIn) {
-        console.log('Loading rooms in ChatWindow...');
-        await getRooms();
-      }
-    };
-
-    loadRooms();
+  const loadRooms = useCallback(async () => {
+    if (isLoggedIn) {
+      console.log('Loading rooms in ChatWindow...');
+      await getRooms();
+    }
   }, [isLoggedIn, getRooms]);
-  // 格式化房间列表
 
-  const formattedRooms = rooms.map((room) => ({
+  useEffect(() => {
+    loadRooms();
+  }, [loadRooms]);
+
+  // 清除错误当切换房间时
+  useEffect(() => {
+    if (error && clearError) {
+      clearError();
+    }
+  }, [selectedRoomId, error, clearError]);
+
+  const formattedRooms: DisplayRoom[] = rooms.map((room: RoomInfo) => ({
     roomId: room.roomId,
     name: room.name,
     topic: room.topic,
     memberCount: room.members,
-    isDirect: room.isDirect,
-    lastMessage: room.lastMessage?.content.body,
+    isDirect: room.isDirect || false,
+    lastMessage: room.lastMessage?.content?.body,
     lastMessageTime: room.lastMessage ? new Date(room.lastMessage.timestamp) : undefined,
     unreadCount: 0,
   }));
 
-  // 获取当前选中的房间
   const selectedRoom = formattedRooms.find((r) => r.roomId === selectedRoomId) || null;
 
-  // 格式化消息列表
-  const formattedMessages = messages.map((msg) => ({
+  const formattedMessages: Message[] = messages.map((msg: MessageContent) => ({
+    id: msg.eventId,
     roomId: msg.roomId,
-    eventId: msg.eventId,
     sender: msg.sender,
+    senderName: msg.sender.split(':')[0].replace('@', ''),
+    content: msg.content.body,
     timestamp: msg.timestamp,
-    content: {
-      msgtype: 'm.text',
-      body: msg.content.body,
-      formatted_body: msg.content.formatted_body,
-    },
-    type: msg.type,
+    type: msg.type === 'm.room.message' ? 'text' : msg.type,
   }));
 
-  // 加载房间列表
-  useEffect(() => {
-    if (isLoggedIn) {
-      getRooms();
-    }
-  }, [isLoggedIn, getRooms]);
-
-  // 切换房间时加载消息
   useEffect(() => {
     if (selectedRoomId) {
       getRoomMessages(selectedRoomId, 100);
     }
   }, [selectedRoomId, getRoomMessages]);
 
-  // 自动滚动到底部
   useEffect(() => {
     if (messageListRef.current && messages.length > 0) {
-      messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+      const scrollElement = messageListRef.current;
+      scrollElement.scrollTop = scrollElement.scrollHeight;
     }
   }, [messages]);
 
@@ -104,127 +87,129 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ onLogout }) => {
   };
 
   const handleLogoutClick = () => {
-    setShowLogoutConfirm(true);
+    Modal.confirm({
+      title: '确认退出',
+      icon: <ExclamationCircleOutlined />,
+      content: '确定要退出登录吗？',
+      okText: '确定',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await logout();
+          if (onLogout) onLogout();
+          message.success('已退出登录');
+        } catch (error) {
+          message.error('退出登录失败');
+        }
+      },
+    });
   };
 
-  const handleConfirmLogout = async () => {
-    if (isLoggingOut) return;
-
-    setIsLoggingOut(true);
-    setShowLogoutConfirm(false);
-
-    try {
-      setSelectedRoomId(null);
-      await logout();
-      if (onLogout) {
-        onLogout();
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
-  const handleCancelLogout = () => {
-    setShowLogoutConfirm(false);
-  };
-
-  const handleCreateRoom = async (options: CreateRoomOptions) => {
+  const handleCreateRoom = async (options: { name: string; topic?: string }) => {
     if (isCreatingRoom) return;
-
     setIsCreatingRoom(true);
     try {
-      const roomId = await createRoom(options);
-      if (roomId) {
-        console.log('Room created:', roomId);
-        // 刷新房间列表
+      const result = await createRoom({
+        name: options.name,
+        topic: options.topic,
+        isDirect: false,
+      });
+      if (result) {
+        message.success(`房间 "${options.name}" 创建成功`);
         await getRooms();
-        // 自动选中新创建的房间
-        setSelectedRoomId(roomId);
-        // 关闭对话框
+        setSelectedRoomId(result);
         setIsCreateDialogOpen(false);
+      } else {
+        message.error('创建房间失败');
       }
-    } catch (error) {
-      console.error('Failed to create room:', error);
+    } catch (error: any) {
+      message.error(error.message || '创建房间失败');
     } finally {
       setIsCreatingRoom(false);
     }
   };
 
-  const handleOpenCreateDialog = () => {
-    setIsCreateDialogOpen(true);
+  const handleDeleteRoom = async (roomId: string): Promise<{ success: boolean; method?: string; message?: string }> => {
+    try {
+      const result = await deleteRoomIntelligent(roomId);
+      if (result.success) {
+        message.success(result.message || '房间已删除');
+
+        // 如果删除的是当前选中的房间，清空选中状态
+        if (selectedRoomId === roomId) {
+          setSelectedRoomId(null);
+        }
+
+        return { success: true, method: result.method, message: result.message };
+      } else {
+        message.error('删除房间失败');
+        return { success: false };
+      }
+    } catch (error: any) {
+      message.error(error.message || '删除房间失败');
+      return { success: false };
+    }
   };
 
-  const handleCloseCreateDialog = () => {
-    setIsCreateDialogOpen(false);
-  };
+  const handleOpenCreateDialog = () => setIsCreateDialogOpen(true);
+  const handleCloseCreateDialog = () => setIsCreateDialogOpen(false);
 
-  // 如果没有选中房间，显示空状态
+  useEffect(() => {
+    if (window.electronAPI?.onRoomDeleted) {
+      const unsubscribe = window.electronAPI.onRoomDeleted((roomId: string) => {
+        if (selectedRoomId === roomId) {
+          setSelectedRoomId(null);
+        }
+        getRooms();
+      });
+      return unsubscribe;
+    }
+  }, [selectedRoomId, getRooms]);
+
   if (!selectedRoom) {
     return (
       <>
-        <div className="chat-window">
-          <RoomList rooms={formattedRooms} selectedRoomId={selectedRoomId} onRoomSelect={setSelectedRoomId} onLogoutClick={handleLogoutClick} onCreateRoomClick={handleOpenCreateDialog} />
-          <div className="chat-main empty-state">
-            <div className="empty-content">
-              <h2>欢迎使用 SmartClaw</h2>
-              <p>选择一个房间开始聊天</p>
-              {error && <div className="error-message">{error}</div>}
+        <div style={{ display: 'flex', height: '100vh' }}>
+          <RoomList
+            rooms={formattedRooms}
+            selectedRoomId={selectedRoomId}
+            onRoomSelect={setSelectedRoomId}
+            onLogoutClick={handleLogoutClick}
+            onCreateRoomClick={handleOpenCreateDialog}
+            onDeleteRoom={handleDeleteRoom}
+          />
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.8)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ color: '#f1f5f9', marginBottom: 16 }}>欢迎使用 SmartClaw</h2>
+              <p style={{ color: '#94a3b8', marginBottom: 24 }}>选择一个房间开始聊天</p>
+              {error && <div style={{ color: '#ef4444', padding: 12, background: 'rgba(239, 68, 68, 0.1)', borderRadius: 8 }}>{error}</div>}
             </div>
           </div>
         </div>
-
-        {/* 确认退出对话框 */}
-        <ConfirmDialog
-          isOpen={showLogoutConfirm}
-          title="确认退出"
-          message="确定要退出登录吗？"
-          confirmText="确定"
-          cancelText="取消"
-          onConfirm={handleConfirmLogout}
-          onCancel={handleCancelLogout}
-          isLoading={isLoggingOut}
-          confirmVariant="danger"
-        />
-
-        {/* 创建房间对话框 */}
-        <CreateRoomDialog isOpen={isCreateDialogOpen} onClose={handleCloseCreateDialog} onCreateRoom={handleCreateRoom} isLoading={isCreatingRoom} />
+        <CreateRoomDialog isOpen={isCreateDialogOpen} onClose={handleCloseCreateDialog} onCreateRoom={handleCreateRoom} isLoading={isCreatingRoom} checkRoomNameExists={checkRoomNameExists} />
       </>
     );
   }
 
   return (
     <>
-      <div className="chat-window">
-        <RoomList rooms={formattedRooms} selectedRoomId={selectedRoomId} onRoomSelect={setSelectedRoomId} onLogoutClick={handleLogoutClick} onCreateRoomClick={handleOpenCreateDialog} />
-
-        <div className="chat-main">
+      <div style={{ display: 'flex', height: '100vh' }}>
+        <RoomList
+          rooms={formattedRooms}
+          selectedRoomId={selectedRoomId}
+          onRoomSelect={setSelectedRoomId}
+          onLogoutClick={handleLogoutClick}
+          onCreateRoomClick={handleOpenCreateDialog}
+          onDeleteRoom={handleDeleteRoom}
+        />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'rgba(15, 23, 42, 0.8)' }}>
           <RoomHeader room={selectedRoom} />
-
           <MessageList messages={formattedMessages} currentUserId={session?.userId} isLoading={isLoading} ref={messageListRef} />
-
           <TypingIndicator roomId={selectedRoomId} typingUsers={typingUsers} />
-
           <MessageInput onSend={handleSendMessage} disabled={isLoading} />
         </div>
       </div>
-
-      {/* 确认退出对话框 */}
-      <ConfirmDialog
-        isOpen={showLogoutConfirm}
-        title="确认退出"
-        message="确定要退出登录吗？"
-        confirmText="确定"
-        cancelText="取消"
-        onConfirm={handleConfirmLogout}
-        onCancel={handleCancelLogout}
-        isLoading={isLoggingOut}
-        confirmVariant="danger"
-      />
-
-      {/* 创建房间对话框 */}
-      <CreateRoomDialog isOpen={isCreateDialogOpen} onClose={handleCloseCreateDialog} onCreateRoom={handleCreateRoom} isLoading={isCreatingRoom} />
+      <CreateRoomDialog isOpen={isCreateDialogOpen} onClose={handleCloseCreateDialog} onCreateRoom={handleCreateRoom} isLoading={isCreatingRoom} checkRoomNameExists={checkRoomNameExists} />
     </>
   );
 };

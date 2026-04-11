@@ -44,3 +44,4 @@ release
 *.log
 .DS_Store
 data/
+.vscode/extensions.json

@@ -1,6 +1,6 @@
 // src/renderer/components/auth/AuthScreen.tsx
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, Alert, Space, Switch, Tabs } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert, Tabs } from 'antd';
 import { UserOutlined, LockOutlined, CloudServerOutlined, MailOutlined } from '@ant-design/icons';
 import { useMatrix } from '../../hooks/useMatrix';
 
@@ -13,7 +13,7 @@ interface AuthScreenProps {
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const { login, register, error } = useMatrix();
+  const { login, register, error, clearError } = useMatrix();
 
   const onFinish = async (values: any) => {
     setLoading(true);
@@ -34,49 +34,73 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
     }
   };
 
+  const handleTabChange = (activeKey: string) => {
+    setIsLogin(activeKey === 'login');
+    if (clearError) {
+      clearError();
+    }
+  };
+
+  const handleFormChange = () => {
+    if (error && clearError) {
+      clearError();
+    }
+  };
+
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '20px',
+        overflowY: 'auto',
       }}
     >
-      <Card style={{ width: 450, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+      <Card
+        style={{
+          width: 450,
+          maxWidth: '100%',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        }}
+      >
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <Title level={2}>SmartClaw</Title>
           <Text type="secondary">Matrix 即时通讯客户端</Text>
         </div>
 
-        <Tabs activeKey={isLogin ? 'login' : 'register'} onChange={(key) => setIsLogin(key === 'login')}>
-          <Tabs.TabPane tab="登录" key="login" />
-          <Tabs.TabPane tab="注册" key="register" />
-        </Tabs>
+        <Tabs
+          activeKey={isLogin ? 'login' : 'register'}
+          onChange={handleTabChange}
+          items={[
+            { key: 'login', label: '登录' },
+            { key: 'register', label: '注册' },
+          ]}
+        />
 
-        <Form name="auth" onFinish={onFinish} autoComplete="off" layout="vertical">
+        <Form name="auth" onFinish={onFinish} onValuesChange={handleFormChange} autoComplete="off" layout="vertical">
           <Form.Item label="服务器地址" name="homeserver" initialValue="http://localhost:8008" rules={[{ required: true, message: '请输入服务器地址' }]}>
-            <Input prefix={<CloudServerOutlined />} placeholder="http://localhost:8008" />
+            <Input disabled prefix={<CloudServerOutlined />} placeholder="http://localhost:8008" size="large" />
           </Form.Item>
 
           <Form.Item label="用户名" name="username" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input prefix={<UserOutlined />} placeholder="username" />
+            <Input prefix={<UserOutlined />} placeholder="username" size="large" />
           </Form.Item>
 
           {!isLogin && (
             <Form.Item label="邮箱" name="email" rules={[{ type: 'email', message: '请输入有效的邮箱地址' }]}>
-              <Input prefix={<MailOutlined />} placeholder="email@example.com" />
+              <Input prefix={<MailOutlined />} placeholder="email@example.com" size="large" />
             </Form.Item>
           )}
 
           <Form.Item label="密码" name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="password" />
+            <Input.Password prefix={<LockOutlined />} placeholder="password" size="large" />
           </Form.Item>
 
           {error && (
             <Form.Item>
-              <Alert message="错误" description={error} type="error" showIcon />
+              <Alert description={`认证失败：${error}`} type="error" showIcon closable />
             </Form.Item>
           )}
 

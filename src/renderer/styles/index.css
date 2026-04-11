@@ -148,3 +148,88 @@ body {
 .ant-typography-ellipsis {
   display: block !important;
 }
+
+/* ========== Alert 组件样式修复 ========== */
+/* 修复 Alert 组件文字颜色被覆盖的问题 */
+.ant-alert {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  border-radius: 8px !important;
+}
+
+.ant-alert-error {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.ant-alert-message {
+  color: #fca5a5 !important;
+  font-weight: 500 !important;
+}
+
+.ant-alert-description {
+  color: #f87171 !important;
+}
+
+.ant-alert-icon {
+  color: #ef4444 !important;
+}
+
+.ant-alert-close-icon {
+  color: #f87171 !important;
+}
+
+.ant-alert-close-icon:hover {
+  color: #ef4444 !important;
+}
+
+/* 确保 Alert 内的文字不被全局样式覆盖 */
+.ant-alert .ant-alert-message,
+.ant-alert .ant-alert-description,
+.ant-alert .ant-typography {
+  color: inherit !important;
+}
+
+/* 成功类型 Alert 样式（如果需要） */
+.ant-alert-success {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.ant-alert-success .ant-alert-message,
+.ant-alert-success .ant-alert-description {
+  color: #6ee7b7 !important;
+}
+
+.ant-alert-success .ant-alert-icon {
+  color: #10b981 !important;
+}
+
+/* 警告类型 Alert 样式（如果需要） */
+.ant-alert-warning {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.ant-alert-warning .ant-alert-message,
+.ant-alert-warning .ant-alert-description {
+  color: #fcd34d !important;
+}
+
+.ant-alert-warning .ant-alert-icon {
+  color: #f59e0b !important;
+}
+
+/* 信息类型 Alert 样式（如果需要） */
+.ant-alert-info {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+.ant-alert-info .ant-alert-message,
+.ant-alert-info .ant-alert-description {
+  color: #93c5fd !important;
+}
+
+.ant-alert-info .ant-alert-icon {
+  color: #3b82f6 !important;
+}

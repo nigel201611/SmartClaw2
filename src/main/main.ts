@@ -14,10 +14,13 @@ import { registerMessageIPCHandlers, cleanupMessageIPC } from './message-ipc';
 
 // 禁用 GPU 加速（可选，节省资源）
 app.disableHardwareAcceleration();
+
 // 应用启动管理器
 let startupManager: AppStartupManager;
+
 // 主窗口引用
 let mainWindow: BrowserWindow | null = null;
+
 // 标记是否正在关闭
 let isQuitting = false;
 
@@ -27,8 +30,10 @@ let isQuitting = false;
 async function onAppReady() {
   startupManager = getAppStartupManager();
   const result = await startupManager.onAppReady();
+
   if (result.success) {
     mainWindow = startupManager.getMainWindow();
+
     // 注册 IPC 处理器
     if (mainWindow) {
       registerAuthIPCHandlers(mainWindow);
@@ -36,6 +41,7 @@ async function onAppReady() {
       registerMatrixIPCHandlers(mainWindow);
       registerSettingsIPCHandlers(mainWindow);
       registerMessageIPCHandlers(mainWindow);
+
       mainWindow.on('close', async (event) => {
         if (isQuitting) {
           return;
@@ -46,10 +52,12 @@ async function onAppReady() {
     }
   } else {
     console.error('SmartClaw startup failed:', result.error);
-    // 应用可能已退出或显示错误对话框
   }
 }
 
+/**
+ * 处理应用关闭
+ */
 async function handleAppClose(): Promise<void> {
   if (isQuitting) return;
   isQuitting = true;
@@ -59,12 +67,11 @@ async function handleAppClose(): Promise<void> {
   }, 3000);
 
   try {
-    // 显示关闭提示（可选）
+    // 显示关闭提示
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('app:closing');
     }
     await performCleanup();
-    console.log('Cleanup completed, exiting...');
     clearTimeout(forceExitTimeout);
     app.exit(0);
   } catch (error) {
@@ -74,15 +81,20 @@ async function handleAppClose(): Promise<void> {
   }
 }
 
+/**
+ * 执行清理操作
+ */
 async function performCleanup(): Promise<void> {
   cleanupDockerIPC();
   cleanupAuthIPC();
   cleanupMatrixIPC();
   cleanupMessageIPC();
+
   if (startupManager) {
     await startupManager.onAppClosing();
   }
 }
+
 // macOS: 所有窗口关闭时
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin' && !isQuitting) {
@@ -96,11 +108,11 @@ app.whenReady().then(async () => {
     await onAppReady();
   } catch (error: any) {
     await dialog.showErrorBox('SmartClaw 启动失败', `发生致命错误：${error.message}\n\n应用将退出。`);
-    app.quit();
+    handleAppClose();
   }
 });
 
-// 应用即将退出 - 修复版
+// 应用即将退出
 app.on('will-quit', async (event) => {
   if (!isQuitting) {
     event.preventDefault();
@@ -130,13 +142,16 @@ app.on('render-process-gone', (event, webContents, details) => {
         if (result.response === 0) {
           mainWindow?.reload();
         } else {
-          app.quit();
+          handleAppClose();
         }
       });
+  } else {
+    handleAppClose();
   }
 });
 
 // ========== 全局 IPC 处理器 ==========
+
 // 获取应用状态
 ipcMain.handle('app:get-status', () => {
   return {
@@ -149,20 +164,62 @@ ipcMain.handle('app:get-status', () => {
 // 重启应用
 ipcMain.handle('app:restart', () => {
   app.relaunch();
-  app.exit(0);
+  handleAppClose();
 });
 
 // 退出应用
 ipcMain.handle('app:quit', () => {
-  app.quit();
+  handleAppClose();
 });
 
+// ========== 进程信号处理 ==========
+// 处理 SIGINT (Ctrl+C)
+process.on('SIGINT', () => {
+  console.log('\nReceived SIGINT (Ctrl+C), shutting down...');
+  handleAppClose();
+});
+
+// 处理 SIGTERM (kill 命令)
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, shutting down...');
+  handleAppClose();
+});
+
+// 处理 SIGQUIT (Ctrl+\)
+process.on('SIGQUIT', () => {
+  console.log('Received SIGQUIT, shutting down...');
+  handleAppClose();
+});
+
+process.on('SIGTSTP', () => {
+  if (!isQuitting) {
+    // 注意：SIGTSTP 默认行为是暂停进程，我们需要覆盖这个行为
+    handleAppClose();
+  }
+});
+
+// 处理 SIGHUP (终端关闭)
+process.on('SIGHUP', () => {
+  console.log('Received SIGHUP, shutting down...');
+  handleAppClose();
+});
+
+// Windows 下的 Ctrl+Break
+if (process.platform === 'win32') {
+  process.on('SIGBREAK', () => {
+    console.log('Received SIGBREAK, shutting down...');
+    handleAppClose();
+  });
+}
+
+// ========== 全局错误处理 ==========
 process.on('uncaughtException', (error) => {
   console.error('Uncaught exception:', error);
-
-  // 避免在退出过程中显示错误框
   if (!isQuitting) {
-    dialog.showErrorBox('未处理的异常', `发生错误：${error.message}\n\n应用可能不稳定。`);
+    dialog.showErrorBox('未处理的异常', `发生错误：${error.message}\n\n应用将退出。`);
+    handleAppClose();
+  } else {
+    app.exit(1);
   }
 });
 
@@ -170,28 +227,18 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled rejection at:', promise, 'reason:', reason);
 });
 
-// 处理 SIGINT (Ctrl+C) 和 SIGTERM 信号
-process.on('SIGINT', () => {
-  console.log('Received SIGINT (Ctrl+C), quitting application...');
-  handleAppClose();
-});
-
-process.on('SIGTERM', () => {
-  console.log('Received SIGTERM, quitting application...');
-  handleAppClose();
-});
-
-// if (process.env.NODE_ENV === 'development') {
-//   // 动态加载 React DevTools
-//   app.whenReady().then(() => {
-//     import('electron-devtools-installer')
-//       .then(({ default: installExtension, REACT_DEVELOPER_TOOLS }) => {
-//         installExtension(REACT_DEVELOPER_TOOLS)
-//           .then((ext: any) => console.log(`Added Extension: ${ext.name || ext}`))
-//           .catch((err: Error) => console.log('An error occurred: ', err));
-//       })
-//       .catch(() => {
-//         // 忽略安装错误
-//       });
-//   });
-// }
+// 开发环境辅助功能
+if (process.env.NODE_ENV === 'development') {
+  console.log('Development mode: Ctrl+C will shutdown gracefully');
+  // app.whenReady().then(() => {
+  //   import('electron-devtools-installer')
+  //     .then(({ default: installExtension, REACT_DEVELOPER_TOOLS }) => {
+  //       installExtension(REACT_DEVELOPER_TOOLS)
+  //         .then((ext: any) => console.log(`Added Extension: ${ext.name || ext}`))
+  //         .catch((err: Error) => console.log('An error occurred: ', err));
+  //     })
+  //     .catch(() => {
+  //       // 忽略安装错误
+  //     });
+  // });
+}

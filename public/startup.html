@@ -5,6 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SmartClaw - 启动中</title>
     <style>
+      :root {
+        /* 颜色系统 */
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --primary-light: #818cf8;
+        --success: #10b981;
+        --error: #ef4444;
+        --warning: #f59e0b;
+
+        /* 背景色 */
+        --bg-dark: #0f172a;
+        --bg-darker: #020617;
+        --bg-sidebar: rgba(15, 23, 42, 0.95);
+        --bg-main: rgba(30, 41, 59, 0.9);
+        --bg-card: rgba(30, 41, 59, 0.8);
+        --bg-card-hover: rgba(30, 41, 59, 0.95);
+        --bg-hover: rgba(51, 65, 85, 0.6);
+        --bg-active: rgba(99, 102, 241, 0.2);
+
+        /* 文本颜色 */
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+
+        /* 边框颜色 */
+        --border: rgba(71, 85, 105, 0.5);
+        --border-light: rgba(71, 85, 105, 0.3);
+        --border-focus: rgba(99, 102, 241, 0.6);
+
+        /* 阴影 */
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+        --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+        /* 圆角 */
+        --radius-sm: 0.375rem;
+        --radius-md: 0.5rem;
+        --radius-lg: 0.75rem;
+        --radius-xl: 1rem;
+        --radius-2xl: 1.5rem;
+
+        /* 过渡动画 */
+        --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+        --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+
+        /* 布局尺寸 */
+        --sidebar-width: 280px;
+        --sidebar-collapsed-width: 70px;
+      }
+
       * {
         margin: 0;
         padding: 0;
@@ -13,32 +66,48 @@
 
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
         display: flex;
         justify-content: center;
         align-items: center;
         min-height: 100vh;
         color: white;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 20px;
+      }
+
+      /* 自定义滚动条 */
+      body::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      body::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px;
+      }
+
+      body::-webkit-scrollbar-thumb {
+        background: #6366f1;
+        border-radius: 3px;
       }
 
       .container {
         text-align: center;
-        padding: 40px;
+        padding: 30px 20px;
         width: 100%;
         max-width: 500px;
+        margin: auto;
       }
 
       .logo {
-        font-size: 64px;
-        font-weight: bold;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
         animation: fadeIn 0.5s ease;
       }
 
       .logo-icon {
-        font-size: 80px;
-        margin-bottom: 10px;
+        font-size: 72px;
+        margin-bottom: 12px;
         display: inline-block;
         animation: pulse 2s ease-in-out infinite;
       }
@@ -48,60 +117,68 @@
         font-weight: 600;
         margin-bottom: 8px;
         letter-spacing: 1px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
 
       .subtitle {
-        font-size: 14px;
-        opacity: 0.7;
-        margin-bottom: 30px;
+        font-size: 13px;
+        opacity: 0.6;
+        margin-bottom: 0;
       }
 
       .status-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 16px;
-        padding: 24px;
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 24px 20px;
         margin: 20px 0;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(99, 102, 241, 0.2);
         transition: all 0.3s ease;
       }
 
       .status {
-        font-size: 18px;
+        font-size: 16px;
         margin-bottom: 20px;
         font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
       }
 
       .status-icon {
         display: inline-block;
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
-        background-color: #ffc107;
-        margin-right: 10px;
+        background-color: #f59e0b;
         animation: blink 1.5s ease-in-out infinite;
       }
 
       .status-icon.success {
-        background-color: #4caf50;
+        background-color: #10b981;
         animation: none;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
       }
 
       .status-icon.warning {
-        background-color: #ff9800;
+        background-color: #f59e0b;
         animation: none;
       }
 
       .status-icon.error {
-        background-color: #f44336;
+        background-color: #ef4444;
         animation: none;
       }
 
       .progress-bar {
         width: 100%;
-        height: 6px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 3px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
         overflow: hidden;
         margin: 20px 0;
       }
@@ -109,84 +186,117 @@
       .progress-fill {
         width: 0%;
         height: 100%;
-        background: linear-gradient(90deg, #4caf50, #8bc34a);
-        border-radius: 3px;
+        background: linear-gradient(90deg, #6366f1, #8b5cf6);
+        border-radius: 2px;
         transition: width 0.3s ease;
       }
 
       .message {
         font-size: 13px;
         opacity: 0.8;
-        margin-top: 15px;
+        margin-top: 16px;
         word-break: break-word;
+        line-height: 1.5;
       }
 
       .detail {
         font-size: 11px;
-        opacity: 0.6;
+        opacity: 0.5;
         margin-top: 8px;
         font-family: monospace;
+        word-break: break-all;
+      }
+
+      .matrix-info {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 11px;
+        opacity: 0.7;
+        word-break: break-word;
       }
 
       .docker-status {
         background: rgba(0, 0, 0, 0.3);
-        border-radius: 12px;
+        border-radius: 16px;
         padding: 16px;
-        margin-top: 20px;
+        margin-top: 16px;
         font-size: 12px;
         text-align: left;
         transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .docker-status-title {
+        font-weight: 600;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
       }
 
       .docker-status-item {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         margin: 8px 0;
-        padding: 4px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .docker-status-item:last-child {
+        border-bottom: none;
       }
 
       .docker-status-label {
         font-weight: 500;
-        opacity: 0.8;
+        opacity: 0.7;
+        font-size: 12px;
       }
 
       .docker-status-value {
         font-family: monospace;
+        font-size: 11px;
       }
 
       .docker-status-value.success {
-        color: #4caf50;
+        color: #10b981;
       }
 
       .docker-status-value.warning {
-        color: #ff9800;
+        color: #f59e0b;
       }
 
       .docker-status-value.error {
-        color: #f44336;
+        color: #ef4444;
       }
 
       .button {
-        background: rgba(255, 255, 255, 0.2);
-        border: none;
+        background: rgba(99, 102, 241, 0.2);
+        border: 1px solid rgba(99, 102, 241, 0.3);
         color: white;
         padding: 8px 20px;
         border-radius: 20px;
         cursor: pointer;
-        font-size: 14px;
-        margin-top: 15px;
-        transition: all 0.3s ease;
+        font-size: 12px;
+        margin-top: 12px;
+        transition: all 0.2s ease;
+        width: 100%;
       }
 
       .button:hover {
-        background: rgba(255, 255, 255, 0.3);
+        background: rgba(99, 102, 241, 0.3);
         transform: translateY(-1px);
       }
 
       .auto-close {
         animation: fadeOut 0.5s ease forwards;
         pointer-events: none;
+      }
+
+      .hidden {
+        display: none;
       }
 
       @keyframes fadeIn {
@@ -227,20 +337,31 @@
           opacity: 1;
         }
         50% {
-          opacity: 0.5;
+          opacity: 0.4;
         }
       }
 
-      .hidden {
-        display: none;
-      }
+      /* 响应式 */
+      @media (max-width: 480px) {
+        .container {
+          padding: 20px 16px;
+        }
 
-      .matrix-info {
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        font-size: 11px;
-        opacity: 0.7;
+        .logo-icon {
+          font-size: 56px;
+        }
+
+        .title {
+          font-size: 24px;
+        }
+
+        .status-card {
+          padding: 20px 16px;
+        }
+
+        .status {
+          font-size: 14px;
+        }
       }
     </style>
   </head>
@@ -266,7 +387,7 @@
       </div>
 
       <div id="dockerStatusPanel" class="docker-status hidden">
-        <div style="font-weight: bold; margin-bottom: 12px">🐳 Docker 状态</div>
+        <div class="docker-status-title"><span>🐳</span> Docker 状态</div>
         <div class="docker-status-item">
           <span class="docker-status-label">安装状态</span>
           <span class="docker-status-value" id="dockerInstalled">检测中...</span>
@@ -279,14 +400,14 @@
           <span class="docker-status-label">版本信息</span>
           <span class="docker-status-value" id="dockerVersion">-</span>
         </div>
-        <button class="button" id="installGuideBtn" style="display: none">📖 查看安装指南</button>
+        <button class="button" id="installGuideBtn" style="display: none">📖 查看 Docker 安装指南</button>
       </div>
     </div>
 
     <script>
       console.log('Startup page loaded');
 
-      // 状态映射 - 移除了 waiting_login 状态
+      // 状态映射
       const stateMessages = {
         initializing: { text: '正在初始化...', icon: 'blink', message: '准备启动环境' },
         'checking-docker': { text: '检测 Docker 环境...', icon: 'blink', message: '检查 Docker 是否已安装' },
@@ -327,7 +448,6 @@
           detailEl.textContent = data.detail;
         }
 
-        // 更新状态样式
         const stateInfo = stateMessages[data.state] || stateMessages['initializing'];
         statusText.textContent = stateInfo.text;
 
@@ -335,7 +455,6 @@
           statusIcon.className = 'status-icon success';
           messageEl.textContent = stateInfo.message;
 
-          // 启动完成后，延迟关闭启动窗口
           if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
           autoCloseTimeout = setTimeout(() => {
             console.log('Startup complete, closing splash window');
@@ -385,35 +504,35 @@
           dockerVersion.textContent = status.version;
         }
 
-        // 显示安装指南按钮
         if (!status.installed || !status.running) {
           installGuideBtn.style.display = 'block';
           messageEl.textContent = 'Docker 未就绪，请先安装并启动 Docker';
+        } else {
+          installGuideBtn.style.display = 'none';
         }
       }
 
-      // 显示 Matrix 状态 - 不再要求登录
+      // 显示 Matrix 状态
       function showMatrixStatus(status) {
         console.log('Matrix status:', status);
 
         if (status.status === 'connected') {
           matrixInfo.style.display = 'block';
           matrixInfo.innerHTML = `✅ Matrix 服务已连接<br>${status.message || ''}`;
-          matrixInfo.style.color = '#4caf50';
+          matrixInfo.style.color = '#10b981';
         } else if (status.status === 'authenticated') {
           matrixInfo.style.display = 'block';
           matrixInfo.innerHTML = `🔐 已登录: ${status.userId || '用户'}<br>${status.message || ''}`;
-          matrixInfo.style.color = '#4caf50';
+          matrixInfo.style.color = '#10b981';
         } else if (status.status === 'connecting') {
           matrixInfo.style.display = 'block';
           matrixInfo.innerHTML = `🔄 ${status.message || '正在连接 Matrix 服务...'}`;
-          matrixInfo.style.color = '#ffc107';
+          matrixInfo.style.color = '#f59e0b';
         } else if (status.status === 'disconnected') {
           matrixInfo.style.display = 'block';
           matrixInfo.innerHTML = `⚠️ Matrix 服务未连接<br>请在主界面中登录或检查服务状态`;
-          matrixInfo.style.color = '#ff9800';
+          matrixInfo.style.color = '#f59e0b';
         } else {
-          // 其他状态，不显示额外信息
           matrixInfo.style.display = 'none';
         }
       }
@@ -430,17 +549,18 @@
       }
 
       // 安装指南按钮点击
-      installGuideBtn.addEventListener('click', () => {
-        if (window.electronAPI && window.electronAPI.openGuide) {
-          window.electronAPI.openGuide();
-        }
-      });
+      if (installGuideBtn) {
+        installGuideBtn.addEventListener('click', () => {
+          if (window.electronAPI && window.electronAPI.openGuide) {
+            window.electronAPI.openGuide();
+          }
+        });
+      }
 
       // 监听来自主进程的事件
       if (window.electronAPI) {
         console.log('Electron API available');
 
-        // 注册启动进度监听
         if (window.electronAPI.onStartupProgress) {
           window.electronAPI.onStartupProgress(updateProgress);
           console.log('onStartupProgress registered');
@@ -448,7 +568,6 @@
           console.warn('onStartupProgress not available');
         }
 
-        // 注册 Docker 状态监听
         if (window.electronAPI.onDockerStatus) {
           window.electronAPI.onDockerStatus(showDockerStatus);
           console.log('onDockerStatus registered');
@@ -456,7 +575,6 @@
           console.warn('onDockerStatus not available');
         }
 
-        // 注册 Matrix 状态监听
         if (window.electronAPI.onMatrixStatus) {
           window.electronAPI.onMatrixStatus(showMatrixStatus);
           console.log('onMatrixStatus registered');
@@ -464,7 +582,6 @@
           console.warn('onMatrixStatus not available');
         }
 
-        // 注册错误监听
         if (window.electronAPI.onStartupError) {
           window.electronAPI.onStartupError(showError);
           console.log('onStartupError registered');

@@ -1,24 +1,17 @@
 // src/renderer/hooks/useMatrix.ts
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useMatrixStore } from '../stores/matrixStore';
-import type { RoomInfo, MessageContent, MatrixSession, SyncState } from '../stores/matrixStore';
+import type { RoomInfo, MessageContent, MatrixSession, SyncState } from '../types';
 
-/**
- * useMatrix Hook 返回值
- */
 interface UseMatrixReturn {
-  // 连接状态
   isConnected: boolean;
   isLoggedIn: boolean;
   session: MatrixSession | null;
   syncState: SyncState | null;
-
-  // 数据
   rooms: RoomInfo[];
   currentRoom: RoomInfo | null;
   messages: MessageContent[];
-
-  // 操作函数
   connect: (homeserverUrl?: string) => Promise<boolean>;
   login: (username: string, password: string, homeserver?: string) => Promise<boolean>;
   register: (username: string, password: string, email?: string, homeserver?: string) => Promise<boolean>;
@@ -29,16 +22,18 @@ interface UseMatrixReturn {
   createRoom: (options?: { name?: string; topic?: string; isDirect?: boolean }) => Promise<string | undefined>;
   joinRoom: (roomIdOrAlias: string) => Promise<RoomInfo>;
   leaveRoom: (roomId: string) => Promise<void>;
+  deleteRoom: (roomId: string) => Promise<{ success: boolean; method?: string; message?: string }>;
+  deleteRoomIntelligent: (roomId: string) => Promise<{ success: boolean; method?: string; message?: string }>;
+  getUserPowerInfo: (roomId: string) => Promise<any>;
+  checkRoomNameExists: (roomName: string, excludeRoomId?: string) => Promise<boolean>;
   setCurrentRoomById: (roomId: string) => void;
-
-  // 状态
+  setCurrentRoom: (room: RoomInfo | null) => void;
+  removeRoom: (roomId: string) => void;
+  clearError: () => void;
   isLoading: boolean;
   error: string | null;
 }
 
-/**
- * useMatrix Hook
- */
 export function useMatrix(options?: {
   autoConnect?: boolean;
   homeserverUrl?: string;
@@ -48,7 +43,6 @@ export function useMatrix(options?: {
 }): UseMatrixReturn {
   const { autoConnect = false, homeserverUrl = 'http://localhost:8008', onMessage, onRoomUpdate, onSyncStateChange } = options || {};
 
-  // 从 store 获取状态和 actions
   const {
     isConnected,
     isLoggedIn,
@@ -69,15 +63,15 @@ export function useMatrix(options?: {
     addMessage,
     setIsLoading,
     setError,
+    clearError,
     reset,
+    removeRoom,
   } = useMatrixStore();
 
-  // 事件监听引用
   const messageCallbackRef = useRef(onMessage);
   const roomUpdateCallbackRef = useRef(onRoomUpdate);
   const syncStateCallbackRef = useRef(onSyncStateChange);
 
-  // 更新回调引用
   useEffect(() => {
     messageCallbackRef.current = onMessage;
   }, [onMessage]);
@@ -90,9 +84,6 @@ export function useMatrix(options?: {
     syncStateCallbackRef.current = onSyncStateChange;
   }, [onSyncStateChange]);
 
-  /**
-   * 检查 Electron API 是否可用
-   */
   const checkElectronAPI = useCallback((): boolean => {
     if (!window.electronAPI) {
       const errorMsg = 'Electron API not available. Make sure preload script is loaded.';
@@ -103,20 +94,14 @@ export function useMatrix(options?: {
     return true;
   }, [setError]);
 
-  /**
-   * 连接服务器
-   */
   const connect = useCallback(
     async (url?: string): Promise<boolean> => {
       if (!checkElectronAPI()) return false;
-
       setIsLoading(true);
       setError(null);
-
       try {
-        await window.electronAPI.connect(url);
+        await window.electronAPI.connect(url || homeserverUrl);
         setIsConnected(true);
-        console.log('Connected to Matrix server');
         return true;
       } catch (err: any) {
         console.error('Connection failed:', err);
@@ -126,22 +111,16 @@ export function useMatrix(options?: {
         setIsLoading(false);
       }
     },
-    [checkElectronAPI, setIsConnected, setIsLoading, setError],
+    [checkElectronAPI, homeserverUrl, setIsConnected, setIsLoading, setError],
   );
 
-  /**
-   * 获取房间列表
-   */
   const getRooms = useCallback(async (): Promise<RoomInfo[]> => {
     if (!checkElectronAPI()) return [];
-
     try {
       const roomsData = await window.electronAPI.getRooms();
       if (!roomsData || !Array.isArray(roomsData)) {
-        console.warn('Rooms data is not an array:', roomsData);
         return [];
       }
-
       const formattedRooms: RoomInfo[] = roomsData.map((room: any) => ({
         roomId: room.roomId,
         name: room.name || room.roomId,
@@ -150,7 +129,6 @@ export function useMatrix(options?: {
         isDirect: room.isDirect || false,
         lastMessage: room.lastMessage,
       }));
-
       setRooms(formattedRooms);
       return formattedRooms;
     } catch (err: any) {
@@ -159,56 +137,72 @@ export function useMatrix(options?: {
     }
   }, [checkElectronAPI, setRooms, setError]);
 
-  /**
-   * 登录
-   */
   const login = useCallback(
     async (username: string, password: string, homeserver?: string): Promise<boolean> => {
       if (!checkElectronAPI()) return false;
-
       setIsLoading(true);
       setError(null);
-
       try {
         const server = homeserver || homeserverUrl;
-        console.log('Logging in to:', server);
+        console.log('Attempting login to:', server);
 
-        const { data: result } = await window.electronAPI.login(server, username, password);
+        const result = await window.electronAPI.login(server, username, password);
         console.log('Login result:', result);
 
-        if (result && result.userId) {
-          const accessToken = await window.electronAPI.getAccessToken();
+        if (result && result.success === false) {
+          const errorMsg = result.error || '登录失败，请检查用户名或密码';
+          console.error('Login failed:', errorMsg);
+          setError(errorMsg);
+          return false;
+        }
+
+        if (result.success && result.data.userId) {
+          // const accessToken = await window.electronAPI.getAccessToken();
           const sessionData: MatrixSession = {
-            userId: result.userId,
-            deviceId: result.deviceId || 'unknown',
-            accessToken: accessToken || '',
+            userId: result.data.userId,
+            deviceId: result.data.deviceId || 'unknown',
+            accessToken: result.data.accessToken || '',
             homeserverUrl: server,
           };
-
-          // 更新 store 状态
           setSession(sessionData);
           setIsLoggedIn(true);
           setIsConnected(true);
-
-          // 获取房间列表
           const roomsList = await getRooms();
           console.log(`Retrieved ${roomsList.length} rooms`);
-
-          // 触发房间更新回调
           if (roomUpdateCallbackRef.current) {
             roomUpdateCallbackRef.current(roomsList);
           }
-
           return true;
         } else {
-          const errorMsg = result?.error || '登录失败';
+          let errorMsg = '登录失败';
+          if (result?.error) {
+            errorMsg = result.error;
+          } else if (result?.message) {
+            errorMsg = result.message;
+          } else if (result && result.httpStatus === 401) {
+            errorMsg = '用户名或密码错误';
+          } else if (result && result.httpStatus === 403) {
+            errorMsg = '账户已被禁用';
+          }
           console.error('Login failed:', errorMsg);
           setError(errorMsg);
           return false;
         }
       } catch (err: any) {
         console.error('Login exception:', err);
-        setError(err.message || '登录失败');
+        let errorMsg = '登录失败，请检查网络连接或服务器地址';
+        if (err.message) {
+          if (err.message.includes('401')) {
+            errorMsg = '用户名或密码错误';
+          } else if (err.message.includes('403')) {
+            errorMsg = '账户已被禁用';
+          } else if (err.message.includes('ECONNREFUSED')) {
+            errorMsg = '无法连接到服务器，请检查服务器地址';
+          } else {
+            errorMsg = err.message;
+          }
+        }
+        setError(errorMsg);
         return false;
       } finally {
         setIsLoading(false);
@@ -220,30 +214,49 @@ export function useMatrix(options?: {
   const register = useCallback(
     async (username: string, password: string, email?: string, homeserver?: string): Promise<boolean> => {
       if (!checkElectronAPI()) return false;
-
       setIsLoading(true);
       setError(null);
-
       try {
         const server = homeserver || homeserverUrl;
-        console.log('Registering to:', server);
+        console.log('Attempting registration to:', server);
 
-        const { success, data: result, error } = await window.electronAPI.register(server, username, password, email);
+        const result = await window.electronAPI.register(server, username, password, email);
+        console.log('Register result:', result);
 
-        if (success && result) {
-          console.log('Registration successful:', result);
+        if (result && result.success === false) {
+          const errorMsg = result.error || '注册失败';
+          setError(errorMsg);
+          return false;
+        }
 
-          // 注册成功后自动登录
+        if (result.success && result.data.userId) {
           const loginSuccess = await login(username, password, server);
           return loginSuccess;
         } else {
-          console.error('Registration failed:', error);
-          setError(error || '注册失败');
+          let errorMsg = '注册失败';
+          if (result?.error) {
+            errorMsg = result.error;
+          } else if (result?.message) {
+            errorMsg = result.message;
+          } else if (result && result.errcode === 'M_USER_IN_USE') {
+            errorMsg = '用户名已被使用';
+          } else if (result && result.errcode === 'M_INVALID_USERNAME') {
+            errorMsg = '用户名无效，只允许包含小写字母、数字、点和下划线';
+          }
+          setError(errorMsg);
           return false;
         }
       } catch (err: any) {
         console.error('Register exception:', err);
-        setError(err.message || '注册失败');
+        let errorMsg = '注册失败，请检查网络连接';
+        if (err.message) {
+          if (err.message.includes('ECONNREFUSED')) {
+            errorMsg = '无法连接到服务器';
+          } else {
+            errorMsg = err.message;
+          }
+        }
+        setError(errorMsg);
         return false;
       } finally {
         setIsLoading(false);
@@ -252,14 +265,12 @@ export function useMatrix(options?: {
     [checkElectronAPI, homeserverUrl, login, setError, setIsLoading],
   );
 
-  /**
-   * 登出
-   */
   const logout = useCallback(async (): Promise<void> => {
     if (!checkElectronAPI()) return;
-
     setIsLoading(true);
     try {
+      await window.electronAPI.logout();
+      reset();
     } catch (err: any) {
       console.error('Logout failed:', err);
       setError(err.message);
@@ -268,20 +279,12 @@ export function useMatrix(options?: {
     }
   }, [checkElectronAPI, reset, setError, setIsLoading]);
 
-  /**
-   * 发送消息
-   */
   const sendMessage = useCallback(
     async (roomId: string, text: string): Promise<boolean> => {
       if (!checkElectronAPI()) return false;
-
       try {
-        const content = {
-          msgtype: 'm.text',
-          body: text,
-        };
+        const content = { msgtype: 'm.text', body: text };
         await window.electronAPI.sendMessage(roomId, content);
-        console.log('Message sent to room:', roomId);
         return true;
       } catch (err: any) {
         console.error('Failed to send message:', err);
@@ -292,18 +295,26 @@ export function useMatrix(options?: {
     [checkElectronAPI, setError],
   );
 
-  /**
-   * 获取房间消息
-   */
   const getRoomMessages = useCallback(
     async (roomId: string, limit: number = 50): Promise<MessageContent[] | undefined> => {
       if (!checkElectronAPI()) return [];
-
       try {
-        const { success, data: messagesData, error } = await window.electronAPI.getRoomMessages(roomId, limit);
-        console.log('getRoomMessages', messagesData, error);
-        if (success) {
-          const formattedMessages: MessageContent[] = messagesData.map((msg: any) => ({
+        const result = await window.electronAPI.getRoomMessages(roomId, limit);
+        if (result && result.success) {
+          const formattedMessages: MessageContent[] = result.data.map((msg: any) => ({
+            roomId: msg.roomId,
+            eventId: msg.eventId,
+            sender: msg.sender,
+            timestamp: msg.timestamp,
+            content: msg.content,
+            type: msg.type,
+          }));
+          if (roomId === currentRoom?.roomId) {
+            setMessages(formattedMessages);
+          }
+          return formattedMessages;
+        } else if (result && result.data) {
+          const formattedMessages: MessageContent[] = result.data.map((msg: any) => ({
             roomId: msg.roomId,
             eventId: msg.eventId,
             sender: msg.sender,
@@ -316,6 +327,7 @@ export function useMatrix(options?: {
           }
           return formattedMessages;
         }
+        return [];
       } catch (err: any) {
         console.error('Failed to get messages:', err);
         setError(err.message);
@@ -325,51 +337,40 @@ export function useMatrix(options?: {
     [currentRoom, checkElectronAPI, setMessages, setError],
   );
 
-  /**
-   * 创建房间
-   */
   const createRoom = useCallback(
     async (options?: { name?: string; topic?: string; isDirect?: boolean }): Promise<string | undefined> => {
-      if (!checkElectronAPI()) return '';
-
+      if (!checkElectronAPI()) return undefined;
       try {
-        const { success, data: result, error } = await window.electronAPI.createRoom(options);
-        if (success) {
-          // 创建成功后刷新房间列表
+        const result = await window.electronAPI.createRoom(options);
+        if (result && result.success) {
           await getRooms();
-          return result;
+          return result.data;
         } else {
-          setError(error);
+          setError(result?.error || '创建房间失败');
+          return undefined;
         }
       } catch (err: any) {
         console.error('Failed to create room:', err);
         setError(err.message);
-        return '';
+        return undefined;
       }
     },
     [checkElectronAPI, getRooms, setError],
   );
 
-  /**
-   * 加入房间
-   */
   const joinRoom = useCallback(
     async (roomIdOrAlias: string): Promise<RoomInfo> => {
       if (!checkElectronAPI()) throw new Error('Electron API not available');
-
       try {
-        await window.electronAPI.joinRoom(roomIdOrAlias);
-        console.log('Joined room:', roomIdOrAlias);
-
-        // 加入后重新获取房间列表
-        const roomsList = await getRooms();
-        const joinedRoom = roomsList.find((r) => r.roomId === roomIdOrAlias);
-
-        if (!joinedRoom) {
-          throw new Error('Failed to find joined room');
+        const result = await window.electronAPI.joinRoom(roomIdOrAlias);
+        if (result && result.success) {
+          const roomsList = await getRooms();
+          const joinedRoom = roomsList.find((r) => r.roomId === roomIdOrAlias);
+          if (!joinedRoom) throw new Error('Failed to find joined room');
+          return joinedRoom;
+        } else {
+          throw new Error(result?.error || '加入房间失败');
         }
-
-        return joinedRoom;
       } catch (err: any) {
         console.error('Failed to join room:', err);
         setError(err.message);
@@ -379,18 +380,11 @@ export function useMatrix(options?: {
     [checkElectronAPI, getRooms, setError],
   );
 
-  /**
-   * 离开房间
-   */
   const leaveRoom = useCallback(
     async (roomId: string): Promise<void> => {
       if (!checkElectronAPI()) return;
-
       try {
         await window.electronAPI.leaveRoom(roomId);
-        console.log('Left room:', roomId);
-
-        // 离开后更新房间列表
         await getRooms();
         if (currentRoom?.roomId === roomId) {
           setCurrentRoom(null);
@@ -403,19 +397,115 @@ export function useMatrix(options?: {
     [checkElectronAPI, getRooms, currentRoom, setCurrentRoom, setError],
   );
 
-  // 监听 Matrix 事件
+  const deleteRoom = useCallback(
+    async (roomId: string): Promise<{ success: boolean; method?: string; message?: string }> => {
+      if (!checkElectronAPI()) return { success: false };
+      try {
+        const result = await window.electronAPI.deleteRoom(roomId);
+        if (result.success) {
+          removeRoom(roomId);
+          if (currentRoom?.roomId === roomId) {
+            setCurrentRoom(null);
+          }
+          await getRooms();
+          return { success: true, method: result.data?.method, message: result.data?.message };
+        } else {
+          setError(result.error || '删除房间失败');
+          return { success: false };
+        }
+      } catch (err: any) {
+        console.error('Failed to delete room:', err);
+        setError(err.message);
+        return { success: false };
+      }
+    },
+    [checkElectronAPI, getRooms, currentRoom, setCurrentRoom, setError, removeRoom],
+  );
+
+  const deleteRoomIntelligent = useCallback(
+    async (roomId: string): Promise<{ success: boolean; method?: string; message?: string }> => {
+      if (!checkElectronAPI()) return { success: false };
+      try {
+        const result = await window.electronAPI.deleteRoomIntelligent(roomId);
+        console.log('Delete room result:', result);
+        if (result.success) {
+          // 立即从本地 store 中移除
+          removeRoom(roomId);
+          // 如果当前选中的房间是被删除的房间，清空选中状态
+          if (currentRoom?.roomId === roomId) {
+            setCurrentRoom(null);
+          }
+
+          // 强制刷新房间列表以确保同步
+          await getRooms();
+
+          // 再次确保从缓存中移除（双重保障）
+          setTimeout(() => {
+            removeRoom(roomId);
+            getRooms();
+          }, 500);
+
+          return {
+            success: true,
+            method: result.data?.method,
+            message: result.data?.message,
+          };
+        } else {
+          setError(result.error || '删除房间失败');
+          return { success: false };
+        }
+      } catch (err: any) {
+        console.error('Failed to delete room:', err);
+        setError(err.message);
+        return { success: false };
+      }
+    },
+    [checkElectronAPI, getRooms, currentRoom, setCurrentRoom, setError, removeRoom],
+  );
+
+  const getUserPowerInfo = useCallback(
+    async (roomId: string): Promise<any> => {
+      if (!checkElectronAPI()) return null;
+      try {
+        const result = await window.electronAPI.getUserPowerInfo(roomId);
+        if (result.success) {
+          return result.data;
+        } else {
+          setError(result.error || '获取权限信息失败');
+          return null;
+        }
+      } catch (err: any) {
+        console.error('Failed to get user power info:', err);
+        setError(err.message);
+        return null;
+      }
+    },
+    [checkElectronAPI, setError],
+  );
+
+  const checkRoomNameExists = useCallback(
+    async (roomName: string, excludeRoomId?: string): Promise<boolean> => {
+      if (!checkElectronAPI()) return false;
+      try {
+        const result = await window.electronAPI.checkRoomNameExists(roomName, excludeRoomId);
+        return result.exists || false;
+      } catch (err: any) {
+        console.error('Failed to check room name:', err);
+        return false;
+      }
+    },
+    [checkElectronAPI],
+  );
+
   useEffect(() => {
     if (!window.electronAPI) return;
 
-    // 监听同步状态
     const syncUnsubscribe = window.electronAPI.onMatrixSync((state: string) => {
       console.log('Sync state changed:', state);
-      const syncStateValue = state as SyncState;
-      setSyncState(syncStateValue);
-      syncStateCallbackRef.current?.(syncStateValue);
+      setSyncState(state as SyncState);
+      syncStateCallbackRef.current?.(state as SyncState);
     });
 
-    // 监听房间更新
     const roomsUnsubscribe = window.electronAPI.onRoomUpdate((roomsData: any[]) => {
       console.log('Room update event received:', roomsData);
       const formattedRooms: RoomInfo[] = roomsData.map((room: any) => ({
@@ -430,7 +520,6 @@ export function useMatrix(options?: {
       roomUpdateCallbackRef.current?.(formattedRooms);
     });
 
-    // 监听消息接收
     const messageUnsubscribe = window.electronAPI.onMessageReceived((message: any) => {
       console.log('Message received:', message);
       const formattedMessage: MessageContent = {
@@ -441,16 +530,12 @@ export function useMatrix(options?: {
         content: message.content,
         type: message.type,
       };
-
       messageCallbackRef.current?.(formattedMessage);
-
-      // 如果是当前房间的消息，添加到消息列表
       if (currentRoom?.roomId === message.roomId) {
         addMessage(formattedMessage);
       }
     });
 
-    // 监听认证状态
     const authUnsubscribe = window.electronAPI.onAuthStatus((authenticated: boolean) => {
       console.log('Auth status changed:', authenticated);
       if (!authenticated) {
@@ -458,12 +543,10 @@ export function useMatrix(options?: {
       }
     });
 
-    // 自动连接
     if (autoConnect && !isConnected) {
       connect(homeserverUrl).catch(console.error);
     }
 
-    // 清理监听器
     return () => {
       syncUnsubscribe();
       roomsUnsubscribe();
@@ -472,9 +555,6 @@ export function useMatrix(options?: {
     };
   }, [autoConnect, homeserverUrl, connect, currentRoom, setSyncState, setRooms, addMessage, reset, isConnected]);
 
-  /**
-   * 通过房间ID设置当前房间
-   */
   const setCurrentRoomById = useCallback(
     (roomId: string) => {
       const room = rooms.find((r) => r.roomId === roomId);
@@ -488,18 +568,13 @@ export function useMatrix(options?: {
   );
 
   return {
-    // 连接状态
     isConnected,
     isLoggedIn,
     session,
     syncState,
-
-    // 数据
     rooms,
     currentRoom,
     messages,
-
-    // 操作函数
     connect,
     login,
     register,
@@ -510,9 +585,14 @@ export function useMatrix(options?: {
     createRoom,
     joinRoom,
     leaveRoom,
+    deleteRoom,
+    deleteRoomIntelligent,
+    getUserPowerInfo,
+    checkRoomNameExists,
     setCurrentRoomById,
-
-    // 状态
+    setCurrentRoom,
+    removeRoom,
+    clearError,
     isLoading,
     error,
   };

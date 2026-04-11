@@ -1,10 +1,11 @@
 // src/renderer/components/chat/RoomList.tsx
 import React, { useState } from 'react';
-import { Input, Button, Avatar, Badge, Tooltip, Empty, Typography, Space, List } from 'antd';
-import { SearchOutlined, PlusOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { Input, Button, Avatar, Badge, Empty, Typography, Space, Modal, message } from 'antd';
+import { SearchOutlined, PlusOutlined, LogoutOutlined, UserOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import type { DisplayRoom } from '../../types';
 
 const { Text } = Typography;
+const { confirm } = Modal;
 
 interface RoomListProps {
   rooms: DisplayRoom[];
@@ -12,12 +13,40 @@ interface RoomListProps {
   onRoomSelect: (roomId: string) => void;
   onLogoutClick: () => void;
   onCreateRoomClick: () => void;
+  onDeleteRoom?: (roomId: string) => Promise<{ success: boolean; method?: string; message?: string }>;
 }
 
-export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoomSelect, onLogoutClick, onCreateRoomClick }) => {
+export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoomSelect, onLogoutClick, onCreateRoomClick, onDeleteRoom }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
 
   const filteredRooms = rooms.filter((room) => room.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const handleDeleteClick = (e: React.MouseEvent, roomId: string, roomName: string) => {
+    e.stopPropagation();
+
+    confirm({
+      title: '确认删除房间',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <p>
+            确定要删除房间 <strong>{roomName}</strong> 吗？
+          </p>
+          <p style={{ color: '#eab308', fontSize: 12, marginTop: 8 }}>提示：系统将根据您的权限自动选择删除方式</p>
+          <p style={{ color: '#ef4444', fontSize: 12 }}>注意：删除后将无法恢复，所有聊天记录将丢失！</p>
+        </div>
+      ),
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        if (onDeleteRoom) {
+          await onDeleteRoom(roomId);
+        }
+      },
+    });
+  };
 
   return (
     <div
@@ -56,6 +85,7 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoo
           style={{
             background: 'rgba(0, 0, 0, 0.3)',
             border: '1px solid rgba(71, 85, 105, 0.2)',
+            color: '#f1f5f9',
           }}
         />
       </div>
@@ -63,13 +93,11 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoo
       {/* 房间列表头部 */}
       <div style={{ padding: '0 16px 8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text strong style={{ color: '#f1f5f9' }}>
-          房间列表
+          房间列表 ({filteredRooms.length})
         </Text>
-        <Tooltip title="创建房间">
-          <Button type="primary" icon={<PlusOutlined />} size="small" onClick={onCreateRoomClick} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', border: 'none' }}>
-            创建房间
-          </Button>
-        </Tooltip>
+        <Button type="primary" icon={<PlusOutlined />} size="small" onClick={onCreateRoomClick} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', border: 'none' }}>
+          创建房间
+        </Button>
       </div>
 
       {/* 房间列表 */}
@@ -96,6 +124,7 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoo
                 background: selectedRoomId === room.roomId ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
                 borderLeft: selectedRoomId === room.roomId ? '3px solid #6366f1' : '3px solid transparent',
                 overflow: 'hidden',
+                position: 'relative',
               }}
               onMouseEnter={(e) => {
                 if (selectedRoomId !== room.roomId) {
@@ -127,6 +156,23 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, selectedRoomId, onRoo
                     </Text>
                   )}
                 </div>
+
+                {/* 删除按钮 */}
+                {!room.isDirect && onDeleteRoom && (
+                  <Button
+                    type="text"
+                    icon={<DeleteOutlined />}
+                    size="small"
+                    loading={deletingRoomId === room.roomId}
+                    style={{
+                      opacity: 0.6,
+                      transition: 'opacity 0.2s',
+                      color: '#ef4444',
+                      flexShrink: 0,
+                    }}
+                    onClick={(e) => handleDeleteClick(e, room.roomId, room.name)}
+                  />
+                )}
               </div>
             </div>
           ))

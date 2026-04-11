@@ -428,15 +428,17 @@ export class AppStartupManager {
     }
 
     this.startupWindow = new BrowserWindow({
-      width: 500,
-      height: 450,
+      width: 1200,
+      height: 800,
+      minWidth: 800,
+      minHeight: 600,
       frame: false,
       movable: true,
       alwaysOnTop: true,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, 'preload.js'),
+        preload: path.join(__dirname, 'preload-startup.js'),
         spellcheck: false,
       },
       show: true,

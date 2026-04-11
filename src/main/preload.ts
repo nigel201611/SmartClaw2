@@ -1,18 +1,14 @@
-/**
- * Preload Script for SmartClaw
- * Exposes Electron API to renderer process via contextBridge
- */
+// src/renderer/preload.ts
 
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-// Types for the exposed API
 export interface IElectronAPI {
   // App methods
   getAppStatus: () => Promise<any>;
   restartApp: () => Promise<void>;
   quitApp: () => Promise<void>;
 
-  // Startup window methods (新增)
+  // Startup window methods
   onStartupProgress: (callback: (data: any) => void) => () => void;
   onDockerStatus: (callback: (status: any) => void) => () => void;
   onMatrixStatus: (callback: (status: any) => void) => () => void;
@@ -38,7 +34,7 @@ export interface IElectronAPI {
   // Auth methods
   checkAuth: () => Promise<any>;
   login: (homeserver: string, username: string, password: string) => Promise<any>;
-  register: (homeserver: string, username: string, password: string, token: string, email?: string) => Promise<any>;
+  register: (homeserver: string, username: string, password: string, token?: string, email?: string) => Promise<any>;
   logout: () => Promise<void>;
   getAuthStatus: () => Promise<any>;
   getCurrentUser: () => Promise<any>;
@@ -54,14 +50,19 @@ export interface IElectronAPI {
   getRooms: () => Promise<any[]>;
   joinRoom: (roomId: string) => Promise<void>;
   leaveRoom: (roomId: string) => Promise<void>;
+  deleteRoom: (roomId: string) => Promise<{ success: boolean; data?: { method: string; message: string }; error?: string }>;
+  deleteRoomIntelligent: (roomId: string) => Promise<{ success: boolean; data?: { method: string; message: string }; error?: string }>;
+  getUserPowerInfo: (roomId: string) => Promise<{ success: boolean; data?: any; error?: string }>;
   sendMessage: (roomId: string, content: any) => Promise<any>;
   sendTyping: (roomId: string, typing: boolean) => Promise<void>;
   sendReadReceipt: (roomId: string, eventId: string) => Promise<void>;
-  getRoomMessages: (roomId: string, limit?: number) => Promise<any[]>;
+  getRoomMessages: (roomId: string, limit?: number) => Promise<any>;
   getRoomMembers: (roomId: string) => Promise<any[]>;
   getEvent: (roomId: string, eventId: string) => Promise<any>;
   sendReaction: (roomId: string, eventId: string, reaction: string) => Promise<void>;
   uploadFile: (roomId: string, file: File) => Promise<any>;
+  createRoom: (options?: { name?: string; topic?: string; isDirect?: boolean }) => Promise<any>;
+  checkRoomNameExists: (roomName: string, excludeRoomId?: string) => Promise<{ exists: boolean }>;
 
   // Message methods
   getMessages: (roomId: string, limit?: number) => Promise<any[]>;
@@ -75,12 +76,12 @@ export interface IElectronAPI {
   getContainerSettings: () => Promise<any>;
   saveContainerSettings: (settings: any) => Promise<void>;
 
-  // Event listeners (原有的)
+  // Event listeners
   onAuthStatus: (callback: (authenticated: boolean) => void) => () => void;
   onMatrixSync: (callback: (state: string) => void) => () => void;
   onRoomUpdate: (callback: (rooms: any[]) => void) => () => void;
   onMessageReceived: (callback: (message: any) => void) => () => void;
-  createRoom: (name: string, topic?: string) => Promise<any>;
+  onRoomDeleted: (callback: (roomId: string) => void) => () => void;
 }
 
 const electronAPI: IElectronAPI = {
@@ -91,72 +92,30 @@ const electronAPI: IElectronAPI = {
 
   // Startup window methods
   onStartupProgress: (callback: (data: any) => void) => {
-    console.log('[Preload] onStartupProgress registered');
-    const listener = (_event: IpcRendererEvent, data: any) => {
-      console.log('[Preload] startup-progress received:', data);
-      callback(data);
-    };
+    const listener = (_event: IpcRendererEvent, data: any) => callback(data);
     ipcRenderer.on('startup-progress', listener);
-    return () => {
-      console.log('[Preload] Removing startup-progress listener');
-      ipcRenderer.removeListener('startup-progress', listener);
-    };
+    return () => ipcRenderer.removeListener('startup-progress', listener);
   },
-
   onDockerStatus: (callback: (status: any) => void) => {
-    console.log('[Preload] onDockerStatus registered');
-    const listener = (_event: IpcRendererEvent, status: any) => {
-      console.log('[Preload] docker-status received:', status);
-      callback(status);
-    };
+    const listener = (_event: IpcRendererEvent, status: any) => callback(status);
     ipcRenderer.on('docker-status', listener);
-    return () => {
-      console.log('[Preload] Removing docker-status listener');
-      ipcRenderer.removeListener('docker-status', listener);
-    };
+    return () => ipcRenderer.removeListener('docker-status', listener);
   },
-
   onMatrixStatus: (callback: (status: any) => void) => {
-    console.log('[Preload] onMatrixStatus registered');
-    const listener = (_event: IpcRendererEvent, status: any) => {
-      console.log('[Preload] matrix-status received:', status);
-      callback(status);
-    };
+    const listener = (_event: IpcRendererEvent, status: any) => callback(status);
     ipcRenderer.on('matrix-status', listener);
-    return () => {
-      console.log('[Preload] Removing matrix-status listener');
-      ipcRenderer.removeListener('matrix-status', listener);
-    };
+    return () => ipcRenderer.removeListener('matrix-status', listener);
   },
-
   onStartupError: (callback: (error: any) => void) => {
-    console.log('[Preload] onStartupError registered');
-    const listener = (_event: IpcRendererEvent, error: any) => {
-      console.log('[Preload] startup-error received:', error);
-      callback(error);
-    };
+    const listener = (_event: IpcRendererEvent, error: any) => callback(error);
     ipcRenderer.on('startup-error', listener);
-    return () => {
-      console.log('[Preload] Removing startup-error listener');
-      ipcRenderer.removeListener('startup-error', listener);
-    };
+    return () => ipcRenderer.removeListener('startup-error', listener);
   },
-
-  getStartupState: () => {
-    console.log('[Preload] getStartupState called');
-    return ipcRenderer.invoke('startup:get-state');
-  },
-
-  openGuide: () => {
-    console.log('[Preload] openGuide called');
-    return ipcRenderer.invoke('open:guide');
-  },
+  getStartupState: () => ipcRenderer.invoke('startup:get-state'),
+  openGuide: () => ipcRenderer.invoke('open:guide'),
 
   // Docker methods
-  checkDocker: () => {
-    console.log('[Preload] checkDocker called');
-    return ipcRenderer.invoke('docker:check');
-  },
+  checkDocker: () => ipcRenderer.invoke('docker:check'),
   startContainer: () => ipcRenderer.invoke('docker:start-container'),
   stopContainer: () => ipcRenderer.invoke('docker:stop-container'),
   restartContainer: () => ipcRenderer.invoke('docker:restart-container'),
@@ -173,7 +132,7 @@ const electronAPI: IElectronAPI = {
   // Auth methods
   checkAuth: () => ipcRenderer.invoke('auth:check'),
   login: (homeserver: string, username: string, password: string) => ipcRenderer.invoke('auth:login', homeserver, username, password),
-  register: (homeserver: string, username: string, password: string, token: string, email?: string) => ipcRenderer.invoke('auth:register', homeserver, username, password, token, email),
+  register: (homeserver: string, username: string, password: string, token?: string, email?: string) => ipcRenderer.invoke('auth:register', homeserver, username, password, token, email),
   logout: () => ipcRenderer.invoke('auth:logout'),
   getAuthStatus: () => ipcRenderer.invoke('auth:get-status'),
   getCurrentUser: () => ipcRenderer.invoke('auth:get-current-user'),
@@ -189,6 +148,9 @@ const electronAPI: IElectronAPI = {
   getRooms: () => ipcRenderer.invoke('matrix:get-rooms'),
   joinRoom: (roomId: string) => ipcRenderer.invoke('matrix:join-room', roomId),
   leaveRoom: (roomId: string) => ipcRenderer.invoke('matrix:leave-room', roomId),
+  deleteRoom: (roomId: string) => ipcRenderer.invoke('matrix:delete-room', roomId),
+  deleteRoomIntelligent: (roomId: string) => ipcRenderer.invoke('matrix:delete-room-intelligent', roomId),
+  getUserPowerInfo: (roomId: string) => ipcRenderer.invoke('matrix:get-user-power-info', roomId),
   sendMessage: (roomId: string, content: any) => ipcRenderer.invoke('matrix:send-message', roomId, content),
   sendTyping: (roomId: string, typing: boolean) => ipcRenderer.invoke('matrix:send-typing', roomId, typing),
   sendReadReceipt: (roomId: string, eventId: string) => ipcRenderer.invoke('matrix:send-read-receipt', roomId, eventId),
@@ -197,6 +159,12 @@ const electronAPI: IElectronAPI = {
   getEvent: (roomId: string, eventId: string) => ipcRenderer.invoke('matrix:get-event', roomId, eventId),
   sendReaction: (roomId: string, eventId: string, reaction: string) => ipcRenderer.invoke('matrix:send-reaction', roomId, eventId, reaction),
   uploadFile: (roomId: string, file: File) => ipcRenderer.invoke('matrix:upload-file', roomId, file),
+  createRoom: async (options?: { name?: string; topic?: string; isDirect?: boolean }) => {
+    return ipcRenderer.invoke('matrix:create-room', options);
+  },
+  checkRoomNameExists: async (roomName: string, excludeRoomId?: string) => {
+    return ipcRenderer.invoke('matrix:check-room-name', roomName, excludeRoomId);
+  },
 
   // Message methods
   getMessages: (roomId: string, limit?: number) => ipcRenderer.invoke('messages:get', roomId, limit),
@@ -210,7 +178,7 @@ const electronAPI: IElectronAPI = {
   getContainerSettings: () => ipcRenderer.invoke('settings:get-container'),
   saveContainerSettings: (settings: any) => ipcRenderer.invoke('settings:save-container', settings),
 
-  // Event listeners (原有的)
+  // Event listeners
   onAuthStatus: (callback: (authenticated: boolean) => void) => {
     const listener = (_event: IpcRendererEvent, authenticated: boolean) => callback(authenticated);
     ipcRenderer.on('auth:status', listener);
@@ -231,12 +199,11 @@ const electronAPI: IElectronAPI = {
     ipcRenderer.on('matrix:message', listener);
     return () => ipcRenderer.removeListener('matrix:message', listener);
   },
-  createRoom: async (name: string, topic?: string) => {
-    const result = await ipcRenderer.invoke('matrix:create-room', name, topic);
-    console.log('IPC: createRoom result:', result);
-    return result;
+  onRoomDeleted: (callback: (roomId: string) => void) => {
+    const listener = (_event: IpcRendererEvent, roomId: string) => callback(roomId);
+    ipcRenderer.on('matrix:room-deleted', listener);
+    return () => ipcRenderer.removeListener('matrix:room-deleted', listener);
   },
 };
 
-// Expose the API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

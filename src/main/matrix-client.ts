@@ -1,16 +1,8 @@
-/**
- * SmartClaw Matrix Client Wrapper
- *
- * 基于 matrix-js-sdk 的 Matrix 客户端封装
- * 提供与本地 Conduit 服务器的连接、认证、消息收发等功能
- */
+// src/main/matrix-client.ts
 
 import { createClient, MatrixClient, ICreateClientOpts, ClientEvent, RoomEvent, SyncState as MatrixSyncState } from 'matrix-js-sdk';
 import { MatrixEvent, Room } from 'matrix-js-sdk';
 
-/**
- * 会话信息
- */
 export interface MatrixSession {
   userId: string;
   deviceId: string;
@@ -18,9 +10,6 @@ export interface MatrixSession {
   homeserverUrl: string;
 }
 
-/**
- * 消息内容
- */
 export interface MessageContent {
   roomId: string;
   eventId: string;
@@ -34,20 +23,15 @@ export interface MessageContent {
   type: string;
 }
 
-/**
- * 房间信息
- */
 export interface RoomInfo {
   roomId: string;
   name: string;
   members: number;
   isDirect: boolean;
   lastMessage?: MessageContent;
+  topic?: string;
 }
 
-/**
- * 同步状态
- */
 export enum SyncState {
   NOT_STARTED = 'NOT_STARTED',
   SYNCING = 'SYNCING',
@@ -57,9 +41,13 @@ export enum SyncState {
   ERROR = 'ERROR',
 }
 
-/**
- * Matrix 客户端包装器
- */
+export interface UserPowerInfo {
+  userId: string;
+  isAdmin: boolean;
+  isCreator: boolean;
+  powerLevel: number;
+}
+
 export class MatrixClientWrapper {
   private client: MatrixClient | null = null;
   private session: MatrixSession | null = null;
@@ -70,30 +58,21 @@ export class MatrixClientWrapper {
   private roomCache: Map<string, RoomInfo> = new Map();
   private isInitialSyncComplete: boolean = false;
 
-  /**
-   * 连接到 Matrix 服务器
-   */
   async connect(homeserverUrl: string): Promise<void> {
     try {
       const url = homeserverUrl.replace(/\/$/, '');
-
       const opts: ICreateClientOpts = {
         baseUrl: url,
         timelineSupport: true,
         useAuthorizationHeader: true,
       };
-
       this.client = createClient(opts);
-      // this.setupEventListeners();
       console.log('Matrix client created, connecting to:', url);
     } catch (error: any) {
       throw new Error(`连接 Matrix 服务器失败：${error.message}`);
     }
   }
 
-  /**
-   * 登录到 Matrix 服务器
-   */
   async login(username: string, password: string): Promise<MatrixSession> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
@@ -117,12 +96,10 @@ export class MatrixClientWrapper {
       };
 
       await this.connectWithToken(this.session);
-
       console.log('Matrix login successful:', this.session.userId);
       return this.session;
     } catch (error: any) {
       console.error('Matrix login failed:', error);
-
       if (error.httpStatus === 401) {
         throw new Error('用户名或密码错误');
       } else if (error.httpStatus === 403) {
@@ -135,9 +112,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 使用访问令牌连接
-   */
   async connectWithToken(session: MatrixSession): Promise<void> {
     if (this.client) {
       this.stopClient();
@@ -145,7 +119,6 @@ export class MatrixClientWrapper {
 
     try {
       const url = session.homeserverUrl.replace(/\/$/, '');
-
       const opts: ICreateClientOpts = {
         baseUrl: url,
         accessToken: session.accessToken,
@@ -156,14 +129,6 @@ export class MatrixClientWrapper {
       };
 
       this.client = createClient(opts);
-      // 手动设置 access token（确保生效）
-      // (this.client as any).accessToken = session.accessToken;
-      // if ((this.client as any).httpOpts) {
-      //   (this.client as any).httpOpts.headers = {
-      //     ...(this.client as any).httpOpts.headers,
-      //     Authorization: `Bearer ${session.accessToken}`,
-      //   };
-      // }
       this.session = session;
       this.isInitialSyncComplete = false;
 
@@ -176,9 +141,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 恢复会话（从存储的凭据）
-   */
   async restoreSession(session: MatrixSession): Promise<boolean> {
     try {
       await this.connectWithToken(session);
@@ -189,9 +151,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 启动同步并等待完成
-   */
   private async startSyncAndWait(): Promise<void> {
     if (!this.client) {
       throw new Error('Client not initialized');
@@ -210,7 +169,7 @@ export class MatrixClientWrapper {
 
       const syncHandler = (state: MatrixSyncState, prevState: MatrixSyncState | null, data: any) => {
         const stateStr = String(state);
-        console.log('Sync state changed:', stateStr, 'Previous:', prevState);
+        console.log('Sync state changed:', stateStr);
 
         switch (stateStr) {
           case 'PREPARED':
@@ -255,23 +214,17 @@ export class MatrixClientWrapper {
     return this.syncPromise;
   }
 
-  /**
-   * 等待同步完成
-   */
   async waitForSync(timeoutMs: number = 30000): Promise<void> {
     if (this.syncState === SyncState.PREPARED) {
       return;
     }
-
     if (this.syncPromise) {
       return this.syncPromise;
     }
-
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Wait for sync timeout'));
       }, timeoutMs);
-
       const checkSync = () => {
         if (this.syncState === SyncState.PREPARED) {
           clearTimeout(timeout);
@@ -283,38 +236,26 @@ export class MatrixClientWrapper {
           setTimeout(checkSync, 100);
         }
       };
-
       checkSync();
     });
   }
 
-  /**
-   * 获取当前同步状态
-   */
   getSyncState(): SyncState {
     return this.syncState;
   }
 
-  /**
-   * 检查同步是否完成
-   */
   isSyncCompleted(): boolean {
     return this.syncState === SyncState.PREPARED && this.isInitialSyncComplete;
   }
 
-  /**
-   * 设置事件监听
-   */
   private setupEventListeners(): void {
     if (!this.client) return;
 
-    // 监听同步事件
     this.client.on(ClientEvent.Sync, (state: MatrixSyncState, prevState: MatrixSyncState | null, data: any) => {
       console.log('Matrix sync state:', state);
       this.emit('sync', { state, prevState, data });
     });
 
-    // 监听房间添加事件
     this.client.on(RoomEvent.MyMembership, (room: Room, membership: string) => {
       if (membership === 'join') {
         console.log('Room joined:', room.roomId, room.name);
@@ -325,7 +266,6 @@ export class MatrixClientWrapper {
       }
     });
 
-    // 监听房间消息
     this.client.on(RoomEvent.Timeline, (event: MatrixEvent, room: Room | undefined, toStartOfTimeline: boolean | undefined) => {
       if (toStartOfTimeline) return;
       if (!room) return;
@@ -343,7 +283,6 @@ export class MatrixClientWrapper {
       }
     });
 
-    // 监听房间名称更新
     this.client.on(RoomEvent.Name, (room: Room) => {
       console.log('Room name updated:', room.roomId, room.name);
       const roomInfo = this.roomCache.get(room.roomId);
@@ -354,19 +293,14 @@ export class MatrixClientWrapper {
       }
     });
 
-    // 监听登录状态
     this.client.on('Session.logged_out' as any, () => {
       console.warn('Matrix session logged out');
       this.emit('logged_out', {});
     });
   }
 
-  /**
-   * 更新房间缓存
-   */
   private updateRoomCache(): void {
     if (!this.client) return;
-
     try {
       const rooms = this.client.getRooms();
       console.log(`Updating room cache with ${rooms.length} rooms`);
@@ -375,21 +309,16 @@ export class MatrixClientWrapper {
         const roomInfo = this.parseRoom(room);
         this.roomCache.set(roomInfo.roomId, roomInfo);
       }
-
       this.emit('rooms_updated', this.getRoomsSync());
     } catch (error) {
       console.error('Failed to update room cache:', error);
     }
   }
 
-  /**
-   * 发送消息
-   */
   async sendMessage(roomId: string, text: string): Promise<string> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
     }
-
     try {
       const response = await this.client.sendTextMessage(roomId, text);
       console.log('Message sent:', response.event_id);
@@ -399,25 +328,19 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 发送格式化消息
-   */
   async sendFormattedMessage(roomId: string, text: string, format: 'plain' | 'html' = 'plain'): Promise<string> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
     }
-
     try {
       const content: any = {
         msgtype: 'm.text',
         body: text,
       };
-
       if (format === 'html') {
         content.format = 'org.matrix.custom.html';
         content.formatted_body = text;
       }
-
       const response = await this.client.sendMessage(roomId, content);
       return response.event_id;
     } catch (error: any) {
@@ -429,103 +352,150 @@ export class MatrixClientWrapper {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
     }
-
-    // 等待同步完成
     if (!this.isSyncCompleted()) {
       await this.waitForSync();
     }
 
-    return Array.from(this.roomCache.values());
+    const rooms = Array.from(this.roomCache.values());
+    const joinedRooms = rooms.filter((room) => {
+      const matrixRoom = this.client?.getRoom(room.roomId);
+      if (matrixRoom) {
+        const myMembership = matrixRoom.getMyMembership();
+        return myMembership === 'join';
+      }
+      return true;
+    });
+
+    console.log(`Total rooms: ${rooms.length}, Joined rooms: ${joinedRooms.length}`);
+    return joinedRooms;
   }
 
-  /**
-   * 同步获取房间列表（从缓存）
-   */
   getRoomsSync(): RoomInfo[] {
-    return Array.from(this.roomCache.values());
+    const rooms = Array.from(this.roomCache.values());
+    const joinedRooms = rooms.filter((room) => {
+      const matrixRoom = this.client?.getRoom(room.roomId);
+      if (matrixRoom) {
+        const myMembership = matrixRoom.getMyMembership();
+        return myMembership === 'join';
+      }
+      return true;
+    });
+    return joinedRooms;
   }
 
-  /**
-   * 获取房间信息
-   */
   async getRoom(roomId: string): Promise<RoomInfo | null> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
     }
-
     const cachedRoom = this.roomCache.get(roomId);
     if (cachedRoom) {
       return cachedRoom;
     }
-
     if (!this.isSyncCompleted()) {
       await this.waitForSync();
     }
-
     const room = this.client.getRoom(roomId);
     if (!room) return null;
-
     const roomInfo = this.parseRoom(room);
     this.roomCache.set(roomId, roomInfo);
     return roomInfo;
   }
 
-  /**
-   * 创建房间
-   */
-  // async createRoom(options?: { name?: string; isDirect?: boolean; invite?: string[] }): Promise<string> {
-  //   if (!this.client) {
-  //     throw new Error('Matrix 客户端未初始化');
-  //   }
+  async isRoomNameExists(roomName: string, excludeRoomId?: string): Promise<boolean> {
+    if (!this.client) {
+      throw new Error('Matrix 客户端未初始化');
+    }
+    if (!this.isSyncCompleted()) {
+      await this.waitForSync();
+    }
+    const rooms = Array.from(this.roomCache.values());
+    return rooms.some((room) => room.name === roomName && (!excludeRoomId || room.roomId !== excludeRoomId));
+  }
 
-  //   // 确保 client 有 access token
-  //   if (!this.session?.accessToken) {
-  //     throw new Error('未登录或 session 已过期');
-  //   }
+  async getRoomNames(): Promise<string[]> {
+    if (!this.client) {
+      throw new Error('Matrix 客户端未初始化');
+    }
+    if (!this.isSyncCompleted()) {
+      await this.waitForSync();
+    }
+    return Array.from(this.roomCache.values()).map((room) => room.name);
+  }
 
-  //   try {
-  //     // 方法1：手动设置 headers（确保 token 被使用）
-  //     const params: any = {
-  //       name: options?.name,
-  //       preset: options?.isDirect ? 'private_chat' : 'public_chat',
-  //       visibility: options?.isDirect ? 'private' : 'public',
-  //       invite: options?.invite || [],
-  //     };
+  async getUserPowerInfo(roomId: string): Promise<UserPowerInfo> {
+    const userId = this.session?.userId;
+    if (!userId) {
+      throw new Error('用户未登录');
+    }
 
-  //     if (options?.isDirect) {
-  //       params.is_direct = true;
-  //     }
+    const homeserverUrl = this.session?.homeserverUrl;
+    const accessToken = this.session?.accessToken;
 
-  //     const homeserverUrl = this.session.homeserverUrl;
-  //     const accessToken = this.session.accessToken;
+    let isCreator = false;
+    let powerLevel = 0;
+    let isAdmin = false;
 
-  //     const response = await fetch(`${homeserverUrl}/_matrix/client/v3/createRoom`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         Authorization: `Bearer ${accessToken}`,
-  //       },
-  //       body: JSON.stringify(params),
-  //     });
+    if (!homeserverUrl || !accessToken) {
+      return { userId, isAdmin, isCreator, powerLevel };
+    }
 
-  //     if (!response.ok) {
-  //       const error = await response.json();
-  //       throw new Error(error.error || `HTTP ${response.status}`);
-  //     }
+    try {
+      // 检查是否是服务器管理员
+      const whoamiResponse = await fetch(`${homeserverUrl}/_matrix/client/v3/account/whoami`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-  //     const data = await response.json();
-  //     console.log('Room created:', data.room_id);
+      if (whoamiResponse.ok) {
+        const data = await whoamiResponse.json();
+        isAdmin = data.admin === true || data.is_admin === true || data.user_type === 'admin';
+        console.log('Admin check result:', isAdmin, data);
+      }
 
-  //     await new Promise((resolve) => setTimeout(resolve, 1000));
-  //     this.updateRoomCache();
+      // 获取房间创建信息
+      const createResponse = await fetch(`${homeserverUrl}/_matrix/client/v3/rooms/${roomId}/state/m.room.create`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-  //     return data.room_id;
-  //   } catch (error: any) {
-  //     console.error('Create room error:', error);
-  //     throw new Error(`创建房间失败：${error.message}`);
-  //   }
-  // }
-  async createRoom(options?: { name?: string; isDirect?: boolean; invite?: string[] }): Promise<string> {
+      if (createResponse.ok) {
+        const data = await createResponse.json();
+        if (data.creator === userId) {
+          isCreator = true;
+        }
+      }
+
+      // 获取权力级别信息
+      const powerResponse = await fetch(`${homeserverUrl}/_matrix/client/v3/rooms/${roomId}/state/m.room.power_levels`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (powerResponse.ok) {
+        const data = await powerResponse.json();
+        powerLevel = data.users?.[userId] || 0;
+        if (powerLevel >= 100) {
+          isCreator = true;
+        }
+      }
+
+      console.log('User power info:', { userId, isAdmin, isCreator, powerLevel });
+    } catch (error) {
+      console.error('Failed to get user power info via API:', error);
+    }
+
+    return {
+      userId,
+      isAdmin,
+      isCreator,
+      powerLevel,
+    };
+  }
+
+  async createRoom(options?: { name?: string; topic?: string; isDirect?: boolean; invite?: string[] }): Promise<string> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
     }
@@ -536,6 +506,7 @@ export class MatrixClientWrapper {
         preset: options?.isDirect ? 'private_chat' : 'public_chat',
         visibility: options?.isDirect ? 'private' : 'public',
         invite: options?.invite || [],
+        topic: options?.topic,
       };
 
       if (options?.isDirect) {
@@ -555,9 +526,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 加入房间
-   */
   async joinRoom(roomIdOrAlias: string): Promise<RoomInfo> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
@@ -574,9 +542,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 离开房间
-   */
   async leaveRoom(roomId: string): Promise<void> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
@@ -591,9 +556,179 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 获取房间消息历史
-   */
+  async kickUser(roomId: string, userId: string, reason?: string): Promise<void> {
+    if (!this.client) {
+      throw new Error('Matrix 客户端未初始化');
+    }
+
+    try {
+      await this.client.kick(roomId, userId, reason);
+      console.log(`Kicked user ${userId} from room ${roomId}`);
+    } catch (error: any) {
+      throw new Error(`踢出用户失败：${error.message}`);
+    }
+  }
+
+  async deleteRoomIntelligent(roomId: string): Promise<{ method: 'admin' | 'creator' | 'leave'; message: string }> {
+    if (!this.client) {
+      throw new Error('Matrix 客户端未初始化');
+    }
+
+    const userId = this.session?.userId;
+    if (!userId) {
+      throw new Error('用户未登录');
+    }
+
+    try {
+      const powerInfo = await this.getUserPowerInfo(roomId);
+      console.log('Delete room power info:', powerInfo);
+
+      if (powerInfo.isAdmin) {
+        console.log('User is admin, attempting force delete...');
+        const success = await this.forceDeleteRoom(roomId);
+        if (success) {
+          this.roomCache.delete(roomId);
+          this.emit('rooms_updated', this.getRoomsSync());
+          return {
+            method: 'admin',
+            message: '已使用管理员权限永久删除房间',
+          };
+        } else {
+          console.log('Force delete failed, falling back to creator logic...');
+        }
+      }
+
+      if (powerInfo.isCreator) {
+        console.log('User is creator, kicking all members...');
+        const room = this.client.getRoom(roomId);
+        if (room) {
+          const members = room.getJoinedMembers();
+          console.log(`Kicking ${members.length - 1} members from room...`);
+
+          for (const member of members) {
+            if (member.userId !== userId) {
+              try {
+                await this.kickUser(roomId, member.userId, 'Room deletion by creator');
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              } catch (kickError) {
+                console.warn(`Failed to kick user ${member.userId}:`, kickError);
+              }
+            }
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        await this.leaveRoom(roomId);
+        this.roomCache.delete(roomId);
+        this.emit('rooms_updated', this.getRoomsSync());
+        return {
+          method: 'creator',
+          message: '已踢出所有成员并离开房间',
+        };
+      }
+
+      console.log('User is normal member, just leaving...');
+      await this.leaveRoom(roomId);
+      this.roomCache.delete(roomId);
+      this.emit('rooms_updated', this.getRoomsSync());
+      return {
+        method: 'leave',
+        message: '已离开房间',
+      };
+    } catch (error: any) {
+      console.error('Delete room error:', error);
+      throw new Error(`删除房间失败：${error.message}`);
+    }
+  }
+
+  async forceDeleteRoom(roomId: string): Promise<boolean> {
+    if (!this.client) {
+      throw new Error('Matrix 客户端未初始化');
+    }
+
+    try {
+      const homeserverUrl = this.session?.homeserverUrl;
+      const accessToken = this.session?.accessToken;
+
+      if (!homeserverUrl || !accessToken) {
+        throw new Error('未登录或会话已过期');
+      }
+
+      // 尝试 Synapse API
+      let response = await fetch(`${homeserverUrl}/_synapse/admin/v1/rooms/${roomId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          block: true,
+          purge: true,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Room deleted via Synapse API:', roomId);
+        return true;
+      }
+
+      // 尝试 Conduit API
+      response = await fetch(`${homeserverUrl}/_conduit/admin/v1/rooms/${roomId}/delete`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        console.log('Room deleted via Conduit API:', roomId);
+        return true;
+      }
+
+      // 尝试 Matrix v3 Admin API
+      response = await fetch(`${homeserverUrl}/_matrix/client/v3/admin/rooms/${roomId}/delete`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          purge: true,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Room deleted via Matrix v3 Admin API:', roomId);
+        return true;
+      }
+
+      // 如果都不成功，尝试踢出所有成员后离开
+      console.log('Admin API not available, falling back to kick all members...');
+      const room = this.client.getRoom(roomId);
+      if (room) {
+        const members = room.getJoinedMembers();
+        for (const member of members) {
+          if (member.userId !== this.session?.userId) {
+            try {
+              await this.kickUser(roomId, member.userId, 'Room deletion by admin');
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            } catch (kickError) {
+              console.warn(`Failed to kick user ${member.userId}:`, kickError);
+            }
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await this.leaveRoom(roomId);
+        return true;
+      }
+
+      return false;
+    } catch (error: any) {
+      console.error('Force delete room error:', error);
+      return false;
+    }
+  }
+
   async getRoomMessages(roomId: string, limit: number = 50): Promise<MessageContent[]> {
     if (!this.client) {
       throw new Error('Matrix 客户端未初始化');
@@ -624,9 +759,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 注册事件监听
-   */
   on(event: string, callback: Function): void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, new Set());
@@ -634,9 +766,6 @@ export class MatrixClientWrapper {
     this.eventListeners.get(event)!.add(callback);
   }
 
-  /**
-   * 移除事件监听
-   */
   off(event: string, callback: Function): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
@@ -644,9 +773,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 触发事件
-   */
   private emit(event: string, data: any): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
@@ -660,9 +786,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 触发同步状态变化
-   */
   private emitSyncState(): void {
     this.syncStateListeners.forEach((listener) => {
       try {
@@ -673,9 +796,6 @@ export class MatrixClientWrapper {
     });
   }
 
-  /**
-   * 监听同步状态变化
-   */
   onSyncStateChange(listener: (state: SyncState) => void): () => void {
     this.syncStateListeners.add(listener);
     return () => {
@@ -683,9 +803,6 @@ export class MatrixClientWrapper {
     };
   }
 
-  /**
-   * 解析消息事件
-   */
   private parseMessage(event: MatrixEvent): MessageContent {
     const content = event.getContent();
     return {
@@ -702,18 +819,12 @@ export class MatrixClientWrapper {
     };
   }
 
-  /**
-   * 检查是否为直聊房间
-   */
   private isDirectRoom(room: Room): boolean {
     try {
-      // 通过 room 的成员数量判断（直聊房间只有2个人）
       const members = room.getJoinedMembers();
       if (members && members.length === 2) {
         return true;
       }
-
-      // 通过 account data 检查
       const directRooms = this.client?.getAccountData('m.direct');
       if (directRooms && directRooms.getContent) {
         const content = directRooms.getContent();
@@ -724,16 +835,12 @@ export class MatrixClientWrapper {
           }
         }
       }
-
       return false;
     } catch (error) {
       return false;
     }
   }
 
-  /**
-   * 解析房间信息
-   */
   private parseRoom(room: Room): RoomInfo {
     try {
       const timeline = room.getLiveTimeline();
@@ -764,23 +871,14 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 获取当前会话
-   */
   getSession(): MatrixSession | null {
     return this.session ? { ...this.session } : null;
   }
 
-  /**
-   * 检查是否已登录
-   */
   isLoggedIn(): boolean {
     return this.session !== null && this.client !== null;
   }
 
-  /**
-   * 登出
-   */
   async logout(): Promise<void> {
     if (!this.client || !this.session) {
       this.stopClient();
@@ -796,9 +894,6 @@ export class MatrixClientWrapper {
     }
   }
 
-  /**
-   * 停止客户端
-   */
   stopClient(): void {
     if (this.client) {
       try {
@@ -816,20 +911,13 @@ export class MatrixClientWrapper {
     this.eventListeners.clear();
   }
 
-  /**
-   * 获取客户端实例（用于高级操作）
-   */
   getClient(): MatrixClient | null {
     return this.client;
   }
 }
 
-// 单例实例
 let matrixClientInstance: MatrixClientWrapper | null = null;
 
-/**
- * 获取 Matrix 客户端单例
- */
 export function getMatrixClient(): MatrixClientWrapper {
   if (!matrixClientInstance) {
     matrixClientInstance = new MatrixClientWrapper();
@@ -837,9 +925,6 @@ export function getMatrixClient(): MatrixClientWrapper {
   return matrixClientInstance;
 }
 
-/**
- * 重置 Matrix 客户端单例（用于测试或完全登出）
- */
 export function resetMatrixClient(): void {
   if (matrixClientInstance) {
     matrixClientInstance.stopClient();
